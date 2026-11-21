@@ -513,7 +513,7 @@ function flushEvents(force) { if (WEB) { webSaveLocal(); return; } const key = c
 setInterval(() => { if (S.phase !== "welcome") flushEvents(); }, 8000);
 
 /* ---------- web mode (no sign-in): progress kept in this browser, copies sent to a Jotform form ---------- */
-const WEB = {"formId": "263245083765058", "url": "https://submit.jotform.com/submit/263245083765058", "fields": {"name": "q2_q2_textbox0", "email": "q3_q3_textbox1", "attempt": "q4_q4_textbox2", "code": "q5_q5_textbox3", "reason": "q6_q6_textbox4", "done": "q7_q7_textbox5", "phase": "q8_q8_textbox6", "snap": ["q9_q9_textarea7", "q11_snapshot2", "q12_snapshot3", "q13_snapshot4"]}, "chunk": 60000, "every": 180000};
+const WEB = {"formId": "263245083765058", "url": "https://submit.jotform.com/submit/263245083765058", "fields": {"name": "q2_q2_textbox0", "email": "q3_q3_textbox1", "attempt": "q4_q4_textbox2", "code": "q5_q5_textbox3", "reason": "q6_q6_textbox4", "done": "q7_q7_textbox5", "phase": "q8_q8_textbox6", "snap": ["q9_q9_textarea7", "q11_snapshot2", "q12_snapshot3", "q13_snapshot4"]}, "chunk": 60000, "pad": 110000, "every": 180000};
 const QS = new URLSearchParams(location.search);
 const REVIEW = !!WEB && QS.has("review");
 const CAND_CODE = (QS.get("c") || "").replace(/[^\w.-]/g, "").slice(0, 40);
@@ -528,7 +528,7 @@ async function gzB64(str) {
   return "gz:" + btoa(out);
 }
 async function unB64(txt) {
-  txt = String(txt || "").replace(/\s+/g, "");
+  txt = String(txt || "").replace(/\s+/g, "").replace(/~+$/, "");
   if (txt.startsWith("b64:")) return decodeURIComponent(escape(atob(txt.slice(4))));
   const bin = atob(txt.replace(/^gz:/, "")), b = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
   return await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream("gzip"))).text();
@@ -554,8 +554,10 @@ function webSend(reason) {
       f.append("formID", WEB.formId); f.append("simple_spc", WEB.formId + "-" + WEB.formId); f.append("website", "");
       f.append(F.name, S.name || ""); f.append(F.email, S.email || ""); f.append(F.attempt, S.session); f.append(F.code, CAND_CODE);
       f.append(F.reason, reason); f.append(F.done, String(doneCount())); f.append(F.phase, S.phase);
-      F.snap.forEach((k, i) => f.append(k, enc.slice(i * WEB.chunk, (i + 1) * WEB.chunk)));
-      await fetch(WEB.url, { method: "POST", mode: "no-cors", body: f, keepalive: enc.length < 45000 });
+      // Pad with "~" (never in base64) to a fixed size so every saved copy reads back the same way when graded.
+      const padded = enc.length < WEB.pad ? enc + "~".repeat(WEB.pad - enc.length) : enc;
+      F.snap.forEach((k, i) => f.append(k, padded.slice(i * WEB.chunk, (i + 1) * WEB.chunk)));
+      await fetch(WEB.url, { method: "POST", mode: "no-cors", body: f });
       ok = true;
     } catch (e) { webDirty = true; console.warn("send failed", e); }
     webSending = null;
