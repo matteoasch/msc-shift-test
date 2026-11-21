@@ -1,0 +1,1178 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style></head><body><title>MSC Shift Simulation</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: an Iris-like work surface (top nav + one working card) with a two-pane conversation dialog. */
+:root{
+  --bg:#ffffff; --fg:#18181b; --muted:#f4f4f5; --muted-fg:#71717a; --border:#e4e4e7; --card:#ffffff;
+  --primary:#27272a; --primary-fg:#fafafa; --ring:#a1a1aa;
+  --red-bg:#fef2f2; --red-bd:#fecaca; --red-chip:#fee2e2; --red-fg:#b91c1c;
+  --amber-bg:#fffbeb; --amber-bd:#fde68a; --amber-chip:#fef3c7; --amber-fg:#92400e;
+  --sky-chip:#e0f2fe; --sky-fg:#075985; --green-chip:#dcfce7; --green-fg:#166534;
+  --bubble-me:#27272a; --bubble-me-fg:#fafafa; --bubble-them:#f4f4f5; --shadow:0 10px 40px rgba(0,0,0,.18);
+  --font:"Montserrat","Gotham","Helvetica Neue",Arial,sans-serif; --mono:ui-monospace,"SF Mono",Menlo,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#09090b; --fg:#fafafa; --muted:#18181b; --muted-fg:#a1a1aa; --border:#27272a; --card:#121214;
+  --primary:#e4e4e7; --primary-fg:#18181b; --ring:#52525b;
+  --red-bg:#2a1215; --red-bd:#7f1d1d; --red-chip:#450a0a; --red-fg:#fca5a5;
+  --amber-bg:#261d0b; --amber-bd:#78350f; --amber-chip:#451a03; --amber-fg:#fcd34d;
+  --sky-chip:#082f49; --sky-fg:#7dd3fc; --green-chip:#052e16; --green-fg:#86efac;
+  --bubble-me:#e4e4e7; --bubble-me-fg:#18181b; --bubble-them:#27272a; --shadow:0 10px 40px rgba(0,0,0,.6); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#09090b; --fg:#fafafa; --muted:#18181b; --muted-fg:#a1a1aa; --border:#27272a; --card:#121214;
+  --primary:#e4e4e7; --primary-fg:#18181b; --ring:#52525b;
+  --red-bg:#2a1215; --red-bd:#7f1d1d; --red-chip:#450a0a; --red-fg:#fca5a5;
+  --amber-bg:#261d0b; --amber-bd:#78350f; --amber-chip:#451a03; --amber-fg:#fcd34d;
+  --sky-chip:#082f49; --sky-fg:#7dd3fc; --green-chip:#052e16; --green-fg:#86efac;
+  --bubble-me:#e4e4e7; --bubble-me-fg:#18181b; --bubble-them:#27272a; --shadow:0 10px 40px rgba(0,0,0,.6); color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:14px;line-height:1.45}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+a{color:inherit}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.btn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:8px;border:1px solid var(--border);background:var(--card);font-size:12.5px;font-weight:500;white-space:nowrap}
+.btn:hover{background:var(--muted)}
+.btn.primary{background:var(--primary);color:var(--primary-fg);border-color:var(--primary)}
+.btn.primary:hover{opacity:.9}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.ghost:hover{background:var(--muted)}
+.btn.danger{color:var(--red-fg);border-color:var(--red-bd)}
+.btn.sm{height:26px;padding:0 9px;font-size:12px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.chip{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:999px;font-size:11px;font-weight:600;background:var(--muted);color:var(--muted-fg);white-space:nowrap}
+.chip.red{background:var(--red-chip);color:var(--red-fg)}.chip.amber{background:var(--amber-chip);color:var(--amber-fg)}.chip.sky{background:var(--sky-chip);color:var(--sky-fg)}.chip.green{background:var(--green-chip);color:var(--green-fg)}
+.muted{color:var(--muted-fg)}
+.small{font-size:12px}
+input[type=text],input[type=date],select,textarea{border:1px solid var(--border);background:var(--card);border-radius:8px;padding:6px 9px;font-size:13px;min-width:0}
+textarea{resize:vertical;width:100%}
+label{font-size:12px;font-weight:500}
+h1,h2,h3{text-wrap:balance;margin:0}
+
+/* top bar */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--card);border-bottom:1px solid var(--border)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--card)}
+.top-in{display:flex;align-items:center;gap:14px;min-height:54px;flex-wrap:wrap;padding-block:6px}
+.logo{display:flex;align-items:center;gap:8px;font-weight:700}
+.logo-tile{width:30px;height:30px;border-radius:8px;background:var(--primary);color:var(--primary-fg);display:grid;place-items:center;font-weight:700}
+.nav{display:flex;gap:2px;flex-wrap:wrap}
+.nav button{border:0;background:transparent;padding:6px 10px;border-radius:8px;font-size:13px;font-weight:500;color:var(--muted-fg);display:flex;gap:6px;align-items:center}
+.nav button.on{background:var(--muted);color:var(--fg)}
+.nav .count{font-size:11px;background:var(--primary);color:var(--primary-fg);border-radius:999px;padding:0 6px;line-height:17px}
+.spacer{flex:1}
+.timer{font-variant-numeric:tabular-nums;font-weight:600;padding:4px 10px;border-radius:8px;background:var(--muted)}
+.timer.warn{background:var(--amber-chip);color:var(--amber-fg)}
+.prog{font-size:12px;color:var(--muted-fg);font-variant-numeric:tabular-nums}
+.banner{padding:8px 0;font-size:12.5px;background:var(--amber-bg);border-bottom:1px solid var(--amber-bd);color:var(--amber-fg)}
+
+main{padding-block:20px 120px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r)}
+.card-h{padding:14px 16px 10px;font-size:15px;font-weight:600;display:flex;align-items:center;gap:10px}
+.card-b{padding:0 16px 16px}
+.sec-h{font-size:12px;font-weight:600;color:var(--muted-fg);text-transform:uppercase;letter-spacing:.04em;margin:14px 0 8px;display:flex;gap:8px;align-items:center}
+.rows{display:flex;flex-direction:column;gap:8px}
+.row{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:var(--card)}
+.row.amber{background:var(--amber-bg);border-color:var(--amber-bd)}
+.row.done{opacity:.7}
+.av{flex:none;width:26px;height:26px;border-radius:999px;display:grid;place-items:center;font-size:11.5px;font-weight:700}
+.row-main{flex:1;min-width:0}
+.row-name{font-weight:600;font-size:13.5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row-prev{font-size:12px;color:var(--muted-fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row-side{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}
+.when{font-size:11.5px;color:var(--muted-fg);white-space:nowrap}
+.empty{padding:24px;text-align:center;color:var(--muted-fg)}
+.max{max-width:1100px;margin:0 auto}
+
+/* dialog */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:50;display:grid;place-items:center;padding:max(12px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) max(12px,env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+.dlg{background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);width:min(1220px,100%);height:min(820px,100%);display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);overflow:hidden}
+.pane{display:flex;flex-direction:column;min-width:0;min-height:0}
+.pane+.pane{border-left:1px solid var(--border);background:var(--muted)}
+.pane-h{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.pane-h .ttl{font-weight:600}
+.thread{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:82%;padding:8px 11px;border-radius:12px;background:var(--bubble-them);white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.me{align-self:flex-end;background:var(--bubble-me);color:var(--bubble-me-fg)}
+.msg .meta{display:block;font-size:10.5px;opacity:.7;margin-bottom:2px;font-weight:600}
+.sys{align-self:center;font-size:11.5px;color:var(--muted-fg);background:var(--muted);border-radius:999px;padding:3px 10px;text-align:center}
+.video{display:flex;gap:8px;align-items:center;font-size:12px;margin-top:6px;padding:8px;border-radius:8px;background:rgba(0,0,0,.08)}
+.composer{border-top:1px solid var(--border);padding:10px 12px;display:flex;flex-direction:column;gap:8px;position:relative}
+.asbar{font-size:12px;background:var(--muted);border-radius:8px;padding:6px 10px}
+.pill{align-self:flex-start;display:inline-flex;gap:6px;align-items:center;border:1px solid var(--border);border-radius:999px;padding:3px 4px 3px 10px;font-size:12px;background:var(--card)}
+.pill button{border:0;background:transparent;padding:0 6px}
+.slash{position:absolute;bottom:100%;left:12px;right:12px;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);max-height:260px;overflow:auto;padding:6px;z-index:5}
+.slash button{display:block;width:100%;text-align:left;border:0;background:transparent;padding:7px 9px;border-radius:7px;font-size:13px}
+.slash button:hover{background:var(--muted)}
+.comp-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.hand{border-top:1px dashed var(--border);padding:10px 14px;background:var(--muted);display:grid;gap:8px}
+.tabs{display:flex;gap:2px;padding:8px 10px 0;flex-wrap:wrap;border-bottom:1px solid var(--border)}
+.tabs button{border:0;background:transparent;padding:7px 10px;font-size:12.5px;font-weight:500;color:var(--muted-fg);border-bottom:2px solid transparent}
+.tabs button.on{color:var(--fg);border-bottom-color:var(--fg)}
+.tab-b{flex:1;overflow:auto;padding:14px}
+.kv{display:grid;grid-template-columns:150px minmax(0,1fr);gap:6px 12px;font-size:13px}
+.kv dt{color:var(--muted-fg)}
+.kv dd{margin:0}
+.wk{margin-bottom:14px}
+.wk-h{font-size:11.5px;font-weight:600;color:var(--muted-fg);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+.wo{border:1px solid var(--border);background:var(--card);border-radius:8px;margin-bottom:6px}
+.wo-h{display:flex;gap:8px;align-items:center;padding:7px 10px;cursor:pointer;flex-wrap:wrap}
+.wo-h .d{font-variant-numeric:tabular-nums;font-size:12px;color:var(--muted-fg);width:78px}
+.wo-b{padding:4px 10px 10px;display:grid;gap:6px}
+.ex{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px}
+.ex .rx{color:var(--muted-fg);font-size:12px}
+.inline-form{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px;border-radius:8px;background:var(--muted)}
+
+/* calendar */
+.cal-ctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.cal-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r);background:var(--card)}
+.cal{border-collapse:collapse;min-width:820px;width:100%;font-size:12px}
+.cal th{position:sticky;top:0;background:var(--card);padding:8px 6px;border-bottom:1px solid var(--border);font-weight:600;text-align:left}
+.cal td{border-top:1px solid var(--border);padding:2px 4px;height:28px;vertical-align:middle}
+.cal td.t{color:var(--muted-fg);width:62px;font-variant-numeric:tabular-nums}
+.slot{width:100%;height:24px;border-radius:6px;border:1px dashed var(--border);background:transparent;font-size:11px;color:var(--muted-fg);text-align:left;padding:0 6px}
+.slot:hover{border-style:solid;border-color:var(--fg);color:var(--fg)}
+.slot.bk{border:0;background:var(--muted);color:var(--fg);font-weight:500;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.slot.ours{background:var(--sky-chip);color:var(--sky-fg)}
+.slot.yours{background:var(--green-chip);color:var(--green-fg)}
+.slot.cx{text-decoration:line-through;opacity:.6}
+.closed{background:repeating-linear-gradient(45deg,transparent 0 6px,var(--muted) 6px 12px)}
+.side{position:fixed;right:max(16px,env(safe-area-inset-right,0px));top:90px;width:min(380px,calc(100vw - 32px));z-index:40;padding:14px;display:grid;gap:10px;box-shadow:var(--shadow)}
+
+/* billing */
+.bill{display:grid;grid-template-columns:260px minmax(0,1fr);gap:16px}
+.cust{display:flex;flex-direction:column;gap:2px;max-height:620px;overflow:auto}
+.cust button{border:0;background:transparent;text-align:left;padding:7px 9px;border-radius:7px;font-size:13px}
+.cust button.on,.cust button:hover{background:var(--muted)}
+table.t{border-collapse:collapse;width:100%;font-size:13px}
+table.t th{text-align:left;font-size:11.5px;color:var(--muted-fg);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--border)}
+table.t td{padding:8px;border-bottom:1px solid var(--border);vertical-align:top}
+.num{font-variant-numeric:tabular-nums;text-align:right}
+
+/* playbook */
+.pb{max-width:860px}
+.pb section{padding:18px 0;border-bottom:1px solid var(--border)}
+.pb h3{font-size:16px;margin-bottom:8px}
+.pb p,.pb li{max-width:68ch}
+.pb ul{padding-left:20px;margin:6px 0}
+.pb li{margin:3px 0}
+.pb-table{border-collapse:collapse;width:100%;font-size:12.5px;margin:8px 0}
+.pb-table th,.pb-table td{border:1px solid var(--border);padding:7px 9px;text-align:left;vertical-align:top}
+.pb-table th{background:var(--muted)}
+.pb-note{font-size:12.5px;color:var(--muted-fg)}
+.pb-wrap{overflow-x:auto}
+
+/* reasoning note + edit */
+.why{border-top:1px dashed var(--border);padding-top:8px;display:grid;gap:4px}
+.why textarea{min-height:44px}
+.msg .edit-l{display:block;margin-top:4px;font-size:11px;opacity:.8}
+.msg .edit-l button{background:none;border:0;padding:0;color:inherit;text-decoration:underline;cursor:pointer;font:inherit}
+.msg-edit{display:grid;gap:6px;align-self:stretch}
+
+/* intro screens */
+.intro{max-width:720px;margin:0 auto;padding-block:40px 80px;display:grid;gap:18px}
+.intro h1{font-size:28px;letter-spacing:-.01em}
+.intro .lead{font-size:15px;color:var(--muted-fg);max-width:62ch}
+.steps{display:grid;gap:10px}
+.step{display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:start}
+.step b.n{width:26px;height:26px;border-radius:999px;background:var(--muted);display:grid;place-items:center;font-size:12px}
+.rules li{margin:4px 0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom,0px));background:var(--primary);color:var(--primary-fg);padding:8px 14px;border-radius:8px;font-size:13px;z-index:90;box-shadow:var(--shadow)}
+.res-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.stat{padding:12px}
+.stat .v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.stat .k{font-size:11.5px;color:var(--muted-fg)}
+.scroll-x{overflow-x:auto}
+pre.log{font-family:var(--mono);font-size:11px;white-space:pre-wrap;max-height:420px;overflow:auto;background:var(--muted);padding:10px;border-radius:8px}
+
+@media (max-width:860px){
+  .dlg{grid-template-columns:1fr;grid-template-rows:minmax(0,1.2fr) minmax(0,1fr);height:100%}
+  .pane+.pane{border-left:0;border-top:1px solid var(--border)}
+  .pane{overflow:auto} .pane .thread{flex:1 0 auto;min-height:120px;overflow:visible}
+  .bill{grid-template-columns:1fr}
+  .kv{grid-template-columns:110px minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div id="app"></div>
+<div id="layer"></div>
+
+<script>
+// Fictional world for the MSC assessment. Every person, price, address and policy here is made up for the exercise.
+const SIM = { today: "2026-12-05", now: "9:00 AM", label: "Saturday, Dec 5 · 9:00 AM PT" };
+
+const OFFICES = {
+  SF: { name: "San Francisco", hours: "Mon–Sat 7:00 AM–7:00 PM (Sat until 2:00 PM). Closed Sun.", days: [1,2,3,4,5,6], parking: "Validated parking in the Harbor Lane garage across the street, level 2. Bring your ticket to the front desk." , gm: "erin"},
+  PA: { name: "Palo Alto", hours: "Tue–Sun 7:00 AM–6:00 PM. Closed Mon.", days: [0,2,3,4,5,6], parking: "Free lot behind the building; use any spot marked Kalos.", gm: "marcus" },
+  SJ: { name: "San Jose", hours: "Mon–Fri 7:00 AM–7:00 PM, Sat 7:00 AM–12:00 PM. Closed Sun.", days: [1,2,3,4,5,6], parking: "Street parking on Alder St (2-hour limit).", gm: "marcus" },
+  WC: { name: "Walnut Creek", hours: "Tue–Sat 7:00 AM–5:00 PM. Closed Sun–Mon.", days: [2,3,4,5,6], parking: "Free parking in the Oak Plaza lot.", gm: "erin" },
+};
+
+const STAFF = {
+  nadia: { name: "Nadia Ortiz", role: "Coach · SF + Walnut Creek", status: "Off today and tomorrow · back Mon Dec 7" },
+  owen: { name: "Owen Lee", role: "Coach · Palo Alto + San Jose", status: "On PTO · back Wed Dec 9" },
+  sam: { name: "Sam Rivera", role: "Coach · San Francisco", status: "Working today 8 AM–2 PM (SF)" },
+  erin: { name: "Erin Walsh", role: "GM · San Francisco + Walnut Creek", status: "Working today" },
+  marcus: { name: "Marcus Bell", role: "GM · Palo Alto + San Jose", status: "Working today" },
+};
+
+const PRICES = [
+  ["First DEXA scan", "$150"],
+  ["Extra progress scan", "$95"],
+  ["4-week program", "$499"],
+  ["12-week package", "$1,788"],
+  ["Monthly membership", "$399 / month"],
+  ["Coaching add-on (nutrition)", "$49 / month"],
+];
+
+// Exercise catalog. pattern = what a fair swap keeps.
+const CATALOG = [
+  ["Barbell Back Squat","Squat"],["DB Goblet Squat","Squat"],["Leg Press","Squat"],
+  ["Bulgarian Split Squat","Single-leg"],["Reverse Lunge","Single-leg"],["DB Step-Up","Single-leg"],["Walking Lunge","Single-leg"],
+  ["Leg Extension","Knee isolation"],["Hamstring Curl","Knee isolation"],
+  ["Barbell RDL","Hinge"],["DB RDL","Hinge"],["Hip Thrust","Hinge"],["Back Extension","Hinge"],["Glute Bridge","Hinge"],
+  ["Lat Pulldown","Vertical pull"],["Assisted Pull-Up","Vertical pull"],["Band Pulldown","Vertical pull"],
+  ["1-Arm DB Row","Horizontal pull"],["Chest-Supported Row","Horizontal pull"],["Seated Cable Row","Horizontal pull"],
+  ["DB Bench Press","Horizontal push"],["Barbell Bench Press","Horizontal push"],["Push-Up","Horizontal push"],
+  ["DB Shoulder Press","Vertical push"],["Pike Push-Up","Vertical push"],
+  ["Plank","Core"],["Dead Bug","Core"],["Hanging Knee Raise","Core"],
+  ["Bike Sprints","Conditioning"],["Rower Intervals","Conditioning"],["Incline Walk","Conditioning"],
+];
+const PATTERN = Object.fromEntries(CATALOG);
+
+const TEMPLATES = {
+  "Upper A": [["DB Bench Press","3×8–10 @ RPE 8"],["1-Arm DB Row","3×10"],["DB Shoulder Press","3×10"],["Lat Pulldown","3×10–12"],["Plank","3×40s"]],
+  "Upper B": [["Barbell Bench Press","4×6"],["Chest-Supported Row","3×10"],["Assisted Pull-Up","3×8"],["Push-Up","2×AMRAP"],["Dead Bug","3×10"]],
+  "Lower A": [["Barbell Back Squat","4×6 @ RPE 7–8"],["Barbell RDL","3×8"],["Bulgarian Split Squat","3×8/leg"],["Hamstring Curl","3×12"],["Bike Sprints","6×20s"]],
+  "Lower B": [["Leg Press","3×10"],["Hip Thrust","3×10"],["Reverse Lunge","3×10/leg"],["Back Extension","3×12"],["Incline Walk","15 min"]],
+  "Full Body": [["DB Goblet Squat","3×10"],["DB RDL","3×10"],["DB Bench Press","3×10"],["Lat Pulldown","3×12"],["Rower Intervals","5×1 min"]],
+  "Home – Bodyweight A": [["DB Goblet Squat","3×15 (backpack or no weight)"],["Push-Up","3×AMRAP"],["Glute Bridge","3×15"],["Dead Bug","3×10"]],
+  "Home – Bodyweight B": [["Reverse Lunge","3×12/leg"],["Pike Push-Up","3×8"],["Back Extension","3×15 (floor)"],["Plank","3×45s"]],
+  "Home – Bodyweight C": [["Walking Lunge","3×20 steps"],["Push-Up","3×AMRAP"],["Glute Bridge","3×20"],["Incline Walk","20 min outdoors"]],
+  "Hotel – Dumbbell": [["DB Goblet Squat","4×12 · 3s lowering"],["1-Arm DB Row","4×12/arm"],["DB Bench Press","3×12"],["DB RDL","3×12"],["Plank","3×45s"]],
+};
+
+// Weekly pattern per member: weekday -> workout. 0=Sun.
+function mkProgram(pattern, start = "2026-11-30", weeks = 4) {
+  const out = []; const d0 = new Date(start + "T12:00:00");
+  for (let i = 0; i < weeks * 7; i++) {
+    const d = new Date(d0); d.setDate(d0.getDate() + i);
+    const w = pattern[d.getDay()];
+    if (w) out.push({ id: "w" + i, date: d.toISOString().slice(0,10), name: w, exercises: TEMPLATES[w].map(([n, rx]) => ({ name: n, rx })) });
+  }
+  return out;
+}
+
+const MEMBERS = {
+  ana:   { name: "Ana Ruiz", coach: "nadia", office: "SF", weight: 142, goal: "Build muscle, keep training through work travel", protein: "110–120 g", calories: "2,000", program: [1,"Lower A",3,"Upper A",5,"Lower B"], lastScan: "Nov 9", notes: ["Travels for work about one week a month.", "Prefers short, direct replies."] },
+  ben:   { name: "Ben Okafor", coach: "nadia", office: "SF", weight: 205, goal: "Lose 15 lb of fat", protein: "160–175 g", calories: "2,300", program: [1,"Upper A",4,"Lower B",6,"Upper B"], lastScan: "Nov 16", notes: ["Long work weeks. Coach Nadia: keep him at 3 days, don't add more."], missed: ["2026-12-03"] },
+  carla: { name: "Carla Mendes", coach: "nadia", office: "SF", weight: 151, goal: "Get stronger, deadlift bodyweight", protein: "115–125 g", calories: "2,050", program: [1,"Upper A",3,"Lower B",5,"Lower A"], lastScan: "Oct 30", notes: ["History of a mild lower-back strain in 2024 (from intake form)."] },
+  dev:   { name: "Dev Patel", coach: "nadia", office: "SF", weight: 176, goal: "Recomp", protein: "140–150 g", calories: "2,400", program: [1,"Upper A",3,"Lower B",5,"Lower A"], lastScan: "Nov 20", notes: [] },
+  elena: { name: "Elena Vasquez", coach: "nadia", office: "WC", weight: 133, goal: "Tone legs and glutes", protein: "100–110 g", calories: "1,850", program: [1,"Lower A",3,"Upper A",6,"Lower B"], lastScan: "Nov 12", notes: [] },
+  frank: { name: "Frank Li", coach: "nadia", office: "SF", weight: 168, goal: "First time lifting, build confidence", protein: "125–135 g", calories: "2,300", program: [1,"Upper A",3,"Lower B",5,"Full Body"], lastScan: "Nov 23", notes: ["New member (week 2). Hasn't used RPE before."], history: [["DB Bench Press","Nov 30","40 lb × 10, 10, 9","RPE 7"],["DB Bench Press","Nov 23","35 lb × 10, 10, 10","RPE 6"],["1-Arm DB Row","Nov 30","35 lb × 10","RPE 7"]] },
+  grace: { name: "Grace Tan", coach: "nadia", office: "SF", weight: 128, goal: "Squat with confidence", protein: "95–105 g", calories: "1,800", program: [2,"Lower A",4,"Upper B",6,"Full Body"], lastScan: "Nov 2", notes: [] },
+  hiro:  { name: "Hiro Sato", coach: "owen", office: "PA", weight: 188, goal: "Lose 10 lb by spring", protein: "150–160 g", calories: "2,200", program: [1,"Upper A",3,"Lower A",5,"Full Body"], lastScan: "Nov 18", notes: [] },
+  isla:  { name: "Isla Novak", coach: "owen", office: "PA", weight: 140, goal: "Consistency", protein: "110–120 g", calories: "1,950", program: [2,"Full Body",4,"Upper A",6,"Lower B"], lastScan: "Nov 25", notes: ["Uses an Apple Watch."] },
+  jamal: { name: "Jamal Wright", coach: "owen", office: "SJ", weight: 181, goal: "Strength for jiu-jitsu", protein: "145–155 g", calories: "2,700", program: [1,"Lower A",3,"Upper B",5,"Full Body"], lastScan: "Nov 10", notes: ["Competes in jiu-jitsu. Prioritise recovery around tournaments."] },
+  kim:   { name: "Kim Huang", coach: "nadia", office: "SF", weight: 122, goal: "Improve fitness", protein: "95–105 g", calories: "1,750", program: [1,"Lower A",3,"Upper A",5,"Lower A"], lastScan: "Nov 4", notes: [] },
+  leo:   { name: "Leo Fischer", coach: "owen", office: "PA", weight: 172, goal: "Lose fat, keep muscle", protein: "140–150 g", calories: "2,150", program: [1,"Upper A",3,"Lower A",5,"Full Body"], lastScan: "Nov 1", notes: [] },
+  maya:  { name: "Maya Johnson", coach: "nadia", office: "WC", weight: 158, goal: "Lose 12 lb", protein: "120–130 g", calories: "1,800", program: [2,"Full Body",4,"Lower B",6,"Upper A"], lastScan: "Nov 2", notes: ["Package scans every 5 weeks."] },
+  noah:  { name: "Noah Brooks", coach: "nadia", office: "SF", weight: 190, goal: "Learn the main lifts", protein: "150–160 g", calories: "2,600", program: [1,"Upper A",3,"Lower A",5,"Full Body"], lastScan: "Nov 28", notes: [] },
+  olivia:{ name: "Olivia Grant", coach: "owen", office: "PA", weight: 136, goal: "Bone density + strength", protein: "105–115 g", calories: "1,900", program: [2,"Full Body",4,"Upper A",6,"Lower B"], lastScan: "Oct 31", notes: [] },
+  priya: { name: "Priya Shah", coach: "nadia", office: "SF", weight: 145, goal: "Lose 8 lb", protein: "115–125 g", calories: "1,800", program: [1,"Upper A",3,"Lower B",5,"Full Body"], lastScan: "Nov 21", notes: [] },
+  quentin:{ name: "Quentin Moore", coach: null, office: "SJ", lead: true, goal: "Lead · website text", notes: ["Not a member yet. Texted the support line."] },
+  rosa:  { name: "Rosa Delgado", coach: "owen", office: "SJ", weight: 162, goal: "Lose fat", protein: "125–135 g", calories: "1,900", program: [1,"Full Body",3,"Upper A",5,"Lower B"], lastScan: "Nov 4", notes: ["Moved from Walnut Creek to San Jose on Nov 15 (closer to her new job)."] },
+  sam:   { name: "Sam Carter", coach: "nadia", office: "SF", weight: 180, goal: "Get to 170 lb", protein: "140–150 g", calories: "2,200", program: [1,"Upper A",3,"Lower A",5,"Full Body"], lastScan: "Nov 19", notes: ["Nadia set protein at 140–150 g on Nov 19 (scan day)."] },
+  tara:  { name: "Tara Nguyen", coach: "nadia", office: "SF", weight: 131, goal: "Recomp", protein: "105–115 g", calories: "1,850", program: [1,"Lower A",3,"Upper A",5,"Lower B"], lastScan: "Nov 15", notes: [] },
+  uma:   { name: "Uma Rao", coach: "nadia", office: "WC", weight: 196, goal: "Lose 25 lb", protein: "140–150 g", calories: "1,900", program: [2,"Full Body",4,"Upper A",6,"Lower B"], lastScan: "Nov 26", notes: [] },
+  victor:{ name: "Victor Alvarez", coach: "owen", office: "PA", weight: 184, goal: "Recomp", protein: "145–155 g", calories: "2,400", program: [1,"Upper A",3,"Lower A",5,"Full Body"], lastScan: "Nov 13", notes: [] },
+  wendy: { name: "Wendy Park", coach: "nadia", office: "SF", weight: 139, goal: "Strength", protein: "110–120 g", calories: "1,950", program: [2,"Lower A",4,"Upper B",6,"Full Body"], lastScan: "Nov 30", notes: [] },
+  xavier:{ name: "Xavier Bennett", coach: "owen", office: "PA", weight: 201, goal: "Lose fat", protein: "155–165 g", calories: "2,300", program: [1,"Upper A",3,"Lower A",5,"Full Body"], lastScan: "Oct 31", notes: ["His Nov 19 scan was moved twice by the office (Owen sick, then a DEXA machine repair)."] },
+  yara:  { name: "Yara Chen", coach: null, office: "SF", lead: true, goal: "Lead · website contact form", notes: ["Not a member yet."] },
+  zoe:   { name: "Zoe Adams", coach: "nadia", office: "SF", weight: 127, goal: "4-week program", protein: "95–105 g", calories: "1,750", program: [1,"Full Body",3,"Upper A",5,"Lower B"], lastScan: "Nov 27", notes: ["Bought the 4-week program on Nov 27 after her first scan."] },
+  aaron: { name: "Aaron Wells", coach: "owen", office: "PA", lead: false, weight: 177, goal: "First scan today", notes: ["Booked first scan online on Dec 2."] },
+  bella: { name: "Bella Ross", coach: "nadia", office: "SF", weight: 149, goal: "Lose 10 lb", protein: "120–130 g", calories: "1,850", program: [1,"Full Body",3,"Upper A",5,"Lower B"], lastScan: "Dec 4", notes: ["Dec 4 scan: body fat 31.2% → 32.7%. Results review with Nadia booked Mon Dec 7, 10:00 AM."] },
+  chris: { name: "Chris Doyle", coach: "nadia", office: "SF", weight: 199, goal: "Lose fat", protein: "155–165 g", calories: "2,350", program: [1,"Upper A",3,"Lower A",5,"Full Body"], lastScan: "Nov 17", notes: [] },
+  dana:  { name: "Dana Fox", coach: "nadia", office: "SF", weight: 135, goal: "Recomp", protein: "105–115 g", calories: "1,900", program: [0,"Lower B",2,"Upper A",4,"Lower A"], lastScan: "Nov 22", notes: [] },
+};
+
+// Calendar: appointments that already exist. type: scan | first | form | call
+const APPTS = [
+  { id: "a1", member: "leo", type: "scan", office: "PA", date: "2026-12-06", time: "10:00", staff: "DEXA" },
+  { id: "a2", member: "noah", type: "form", office: "SF", date: "2026-12-05", time: "11:30", staff: "sam" },
+  { id: "a3", member: "olivia", type: "scan", office: "PA", date: "2026-12-06", time: "08:00", staff: "DEXA" },
+  { id: "a4", member: "priya", type: "call", office: "Virtual", date: "2026-12-10", time: "17:00", staff: "nadia" }, // she asks to move it to Mon Dec 7 at 5, which is taken
+  { id: "a5", member: "rosa", type: "scan", office: "SJ", date: "2026-12-09", time: "07:30", staff: "DEXA" },
+  { id: "a6", member: "aaron", type: "first", office: "PA", date: "2026-12-05", time: "13:00", staff: "DEXA" },
+  { id: "a7", member: "bella", type: "call", office: "Virtual", date: "2026-12-07", time: "10:00", staff: "nadia" },
+  { id: "a8", member: "xavier", type: "scan", office: "PA", date: "2026-12-12", time: "08:00", staff: "DEXA" },
+  // Filler bookings by other members so the calendar looks real.
+  { id: "f1", other: "Member", type: "call", office: "Virtual", date: "2026-12-07", time: "17:00", staff: "nadia" },
+  { id: "f2", other: "Member", type: "call", office: "Virtual", date: "2026-12-07", time: "16:30", staff: "nadia" },
+];
+
+// Slots that are booked (by other members) on top of APPTS, to set the traps.
+const TAKEN = {
+  "PA|2026-12-08": ["08:00","10:00","11:00","13:30","15:00"],
+  "SF|2026-12-08": ["07:00","07:30","09:00","10:00"],
+  "WC|2026-12-12": ["08:00","09:30","10:00"],
+  "WC|2026-12-08": ["07:00","08:30","09:00","11:00"],
+  "SJ|2026-12-08": ["17:00","17:30","18:30"],
+  "SJ|2026-12-10": ["17:00","18:00","18:30"],
+  "SF|2026-12-07": ["07:00","08:00","12:00","17:00"],
+};
+const CALL_TAKEN = { "nadia|2026-12-07": ["09:00","10:00","16:30","17:00"], "nadia|2026-12-08": ["11:00"] };
+
+const BILLING = {
+  victor: [
+    { id: "ch_v4", date: "2026-12-01", desc: "Monthly membership", amount: 399 },
+    { id: "ch_v3", date: "2026-12-01", desc: "Monthly membership", amount: 399 },
+    { id: "ch_v2", date: "2026-12-01", desc: "Coaching add-on (nutrition)", amount: 49 },
+    { id: "ch_v1", date: "2026-11-01", desc: "Monthly membership", amount: 399 },
+    { id: "ch_v0", date: "2026-11-01", desc: "Coaching add-on (nutrition)", amount: 49 },
+  ],
+  wendy: [
+    { id: "ch_w2", date: "2026-10-28", desc: "Extra progress scan", amount: 95 },
+    { id: "ch_w1", date: "2026-10-14", desc: "12-week package", amount: 1788 },
+    { id: "ch_w0", date: "2026-10-01", desc: "First DEXA scan", amount: 150 },
+  ],
+  zoe: [
+    { id: "ch_z1", date: "2026-11-27", desc: "4-week program", amount: 499 },
+    { id: "ch_z0", date: "2026-11-27", desc: "First DEXA scan", amount: 150 },
+  ],
+  xavier: [
+    { id: "ch_x1", date: "2026-10-01", desc: "12-week package", amount: 1788 },
+    { id: "ch_x0", date: "2026-09-20", desc: "First DEXA scan", amount: 150 },
+  ],
+  olivia: [{ id: "ch_o0", date: "2026-10-03", desc: "12-week package", amount: 1788 }],
+  leo: [{ id: "ch_l0", date: "2026-10-12", desc: "12-week package", amount: 1788 }],
+};
+
+// The 30 to-dos. `at` = minutes before 9:00 AM sim time the message arrived.
+const TODOS = [
+  { id: "t01", m: "ana", ch: "chat", topic: "Hotel gym swaps", ago: 95, thread: [["m","Hi! I'm in Denver Mon–Fri next week for work. Hotel gym only has dumbbells up to 25 lb, a flat bench and a treadmill. What do I do about back squats and the lat pulldown?"]] },
+  { id: "t02", m: "ben", ch: "chat", topic: "Missed workout", ago: 61, thread: [["m","Missed Thursday's workout, work got crazy. Should I do it today or just do today's Upper B?"]] },
+  { id: "t03", m: "carla", ch: "comment", topic: "Barbell RDL · Fri Dec 4", ago: 45, thread: [["m","Right side of my lower back kind of pinched on the 3rd set so I stopped there. Still a bit tight this morning."]] },
+  { id: "t04", m: "dev", ch: "comment", topic: "Barbell Back Squat · Fri Dec 4", ago: 900, thread: [["m","185 × 8 × 3. Felt smooth 💪"]] },
+  { id: "t05", m: "elena", ch: "chat", topic: "Exercise swap", ago: 300, thread: [["m","Can I swap Bulgarian split squats for something else? I hate them lol"]] },
+  { id: "t06", m: "frank", ch: "chat", topic: "Weight for DB bench", ago: 40, thread: [["m","What weight should I use for DB bench on Monday? It says RPE 8, no idea what that means 😅"]] },
+  { id: "t07", m: "grace", ch: "chat", topic: "Squat form video", ago: 130, video: "squat_115lb.mov · 0:24", thread: [["m","Form check on my squat at 115? Feels like my knees cave in on the way up."]] },
+  { id: "t08", m: "hiro", ch: "chat", topic: "Holiday workouts", ago: 220, thread: [["m","I'll be at my parents' Dec 21–27, no gym, just a yoga mat. Can you give me something for that week?"]] },
+  { id: "t09", m: "isla", ch: "chat", topic: "Apple Watch not syncing", ago: 180, thread: [["m","My Apple Watch workouts stopped showing up in the app since yesterday?"]] },
+  { id: "t10", m: "jamal", ch: "chat", topic: "Pause for camp", ago: 410, thread: [["m","Heading to a jiu-jitsu camp Dec 14–27. Can we pause my workouts while I'm there? Back home the 28th."]] },
+  { id: "t11", m: "kim", ch: "comment", topic: "Bike Sprints · Fri Dec 4", ago: 960, thread: [["m","Got really dizzy and had to sit down for a few minutes during the bike sprints. Happened last week too."]] },
+  { id: "t12", m: "leo", ch: "chat", topic: "Reschedule tomorrow's scan", ago: 25, thread: [["m","Need to move tomorrow's 10am scan, something came up. Tuesday morning would be ideal."]] },
+  { id: "t13", m: "maya", ch: "chat", topic: "Next scan", ago: 260, thread: [["m","When should my next scan be? Could I do next Sunday?"]] },
+  { id: "t14", m: "noah", ch: "text", topic: "Running late", ago: 2, thread: [["m","Running ~15 min late for my 11:30 today, sorry!"]] },
+  { id: "t15", m: "olivia", ch: "email", topic: "Cancel scan (sick)", ago: 140, subject: "Can't make tomorrow", thread: [["m","Hi, I've come down with the flu and can't make my scan tomorrow at 8. Please cancel it and I'll rebook when I'm better. Thanks, Olivia"]] },
+  { id: "t16", m: "priya", ch: "chat", topic: "Move check-in call", ago: 75, thread: [["m","Can we move my check-in call with Nadia to Monday at 5?"]] },
+  { id: "t17", m: "quentin", ch: "text", topic: "New lead · first scan", ago: 55, thread: [["m","Hi, do you have anything this week in San Jose for a first scan? Weekday evening ideally."]] },
+  { id: "t18", m: "rosa", ch: "chat", topic: "Scan time", ago: 15, thread: [["m","What time is my scan Wednesday again? Walnut Creek right?"]] },
+  { id: "t19", m: "sam", ch: "chat", topic: "Protein target", ago: 330, thread: [["m","How much protein should I actually be eating?"]] },
+  { id: "t20", m: "tara", ch: "chat", topic: "Snack swap", ago: 290, thread: [["m","Is it ok to swap my afternoon Greek yogurt for a protein bar sometimes?"]] },
+  { id: "t21", m: "uma", ch: "chat", topic: "New medication", ago: 380, thread: [["m","My doctor started me on Ozempic this week. Should I change my calories?"]] },
+  { id: "t22", m: "victor", ch: "email", topic: "Charged twice", ago: 600, subject: "Double charge?", thread: [["m","Hi, looks like I got charged twice on Dec 1? Can you check? – Victor"]] },
+  { id: "t23", m: "wendy", ch: "email", topic: "FSA receipt", ago: 700, subject: "Receipt for FSA", thread: [["m","Hi! I need a receipt for my FSA for the 12-week package I bought in October. Thank you!"]] },
+  { id: "t24", m: "xavier", ch: "voicemail", topic: "Voicemail · upset", ago: 35, thread: [["m","[Voicemail, 0:48] Yeah this is Xavier Bennett. This is the third time my scan's gotten moved by you guys. I'm done. I want to cancel and get my money back. Call me back."]] },
+  { id: "t25", m: "yara", ch: "form", topic: "Website question · lead", ago: 500, subject: "Contact form", thread: [["m","How much is a DEXA scan and do I need to do anything to prepare?"]] },
+  { id: "t26", m: "zoe", ch: "email", topic: "Refund request", ago: 650, subject: "Refund", thread: [["m","Hi, I bought the 4-week program last week but honestly it's not for me. Can I get a refund?"]] },
+  { id: "t27", m: "aaron", ch: "text", topic: "Parking question", ago: 10, thread: [["m","Where do I park at the SF office? First time coming in today at 1."]] },
+  { id: "t28", m: "bella", ch: "chat", topic: "Scan results", ago: 470, thread: [["m","Got my scan results, body fat went UP 1.5% even though I've been perfect with everything. What am I doing wrong??"]] },
+  { id: "t29", m: "chris", ch: "chat", topic: "Personal", ago: 200, thread: [["m","Hey, my dad passed away Wednesday. I'm going to be off for a while, sorry."]] },
+  { id: "t30", m: "dana", ch: "chat", topic: "Swap workout day", ago: 30, thread: [["m","Can I do tomorrow's workout today instead?", "fwd"]] },
+];
+
+// Where each to-do shows up. flag = "Reply as the coach" section (replying as that coach).
+const PLACE = {
+  t10: { flag: "Refund risk" }, t12: { flag: "Reschedule · tomorrow" }, t29: { flag: "Refund risk" },
+  t14: { support: true, from: "(415) 555-0114" }, t15: { support: true, from: "olivia.grant@example.com" }, t17: { support: true, from: "(408) 555-0117" },
+  t22: { support: true, from: "victor.alvarez@example.com" }, t23: { support: true, from: "wendy.park@example.com" }, t24: { support: true, from: "(650) 555-0124" },
+  t25: { support: true, from: "yara.chen@example.com" }, t26: { support: true, from: "zoe.adams@example.com" }, t27: { support: true, from: "(650) 555-0127" },
+};
+// No saved-reply suggestion pills (Callum, Nov 21): candidates write every reply themselves.
+const SUGGEST = {};
+const SAVED_REPLIES = {
+  "Connecting an app": "To connect Apple Health or Health Connect: open the Kalos app → Profile → Connected apps → choose your app and allow access. Steps and workouts usually appear within a few minutes.",
+  "Watch workouts or steps not showing": "Let's get that syncing again! On your iPhone open the Health app → your profile picture → Apps → Kalos, and make sure Workouts and Steps are turned on. Then fully close the Kalos app and reopen it. If they still don't show up after that, let me know and I'll report it to our team.",
+  "Logging food": "You can log food from the Nutrition tab in the app: tap + and snap a photo or search for the food. Photos are the fastest way!",
+  "Logging an activity outside your program": "To log an activity outside your program (a hike, a class, a run), go to the Calendar tab → + → Activity, pick the type and duration.",
+  "Which weight to enter": "Always enter the total weight you lifted. For dumbbells, add both together: two 20 lb dumbbells is 40 lb. For barbells, include the bar (the standard bar is 45 lb).",
+  "Seeing your next appointment": "You can see your upcoming appointments in the app under Profile → Appointments, and in your confirmation email.",
+  "Rescheduling an appointment": "No problem at all! Here's the link to pick a new time: kalos.example/reschedule. If nothing works, reply here with a couple of times and I'll find something for you.",
+};
+// Coach's private 1:1 (read-only, shown beside the group). Default: a short older exchange.
+const ONE_ON_ONE = {
+  dana: [["m","Feeling good after this week! 🙌","Thu 6:12 PM"],["c","Love that Dana! Keep the momentum going.","Thu 7:40 PM"],["m","Can I do tomorrow's workout today instead?","Today 8:30 AM"],["c","Yes go for it! Just do Sunday's Lower B today and rest tomorrow 🙂","Today 8:52 AM"]],
+  carla: [["c","Great job hitting all 3 workouts last week Carla!","Mon 10:02 AM"],["m","Thanks! Feeling stronger already","Mon 12:15 PM"]],
+  bella: [["c","See you for your scan Friday! Remember no big workout beforehand.","Wed 3:20 PM"],["m","Will do!","Wed 3:41 PM"]],
+};
+
+const PLAYBOOK_HTML = "<section id=\"pb-shift\"><h3>Your shift today</h3>\n<p>It's <b>Saturday, Dec 5, 9:00 AM PT</b>, and you're the Member Success Coach (MSC) on shift. You cover:</p>\n<ul>\n<li><b>Nadia Ortiz's members.</b> Nadia coaches in San Francisco and Walnut Creek. She's off today and tomorrow and back Monday Dec 7.</li>\n<li><b>Owen Lee's members.</b> Owen coaches in Palo Alto and San Jose. He's on PTO until Wednesday Dec 9.</li>\n<li><b>The support inbox:</b> emails, texts, voicemails and website forms for every office.</li>\n</ul>\n<p>Who else is working today:</p>\n<ul>\n<li><b>Sam Rivera</b> (coach) runs form sessions in San Francisco from 8 AM to 2 PM.</li>\n<li><b>Erin Walsh</b> is GM for San Francisco and Walnut Creek.</li>\n<li><b>Marcus Bell</b> is GM for Palo Alto and San Jose.</li>\n</ul>\n<p class=\"pb-note\">Everyone, every member and every price in this exercise is made up. The policies on this page are the rules for this test.</p>\n</section>\n\n<section id=\"pb-inbox\"><h3>How the Inbox works</h3>\n<ul>\n<li><b>Reply as the coach.</b> Iris flags some messages for coaches who are out: refund risks and reschedules for today or tomorrow. These replies go into the coach's own chat, under the coach's name. The flag is a guess, so read the message yourself.</li>\n<li><b>Reply in a group.</b> For every other message, you reply as yourself in the member's group chat. The group is just the member, their coach and you.</li>\n<li><b>Read the coach's 1:1 before you reply.</b> It's shown beside the group. The coach sometimes answers on a day off.</li>\n<li><b>Answer only real asks:</b> questions, change requests, problems and worries. Workout logs, wins and thank-yous with no question are left for the coach to acknowledge when they're back. Use <b>Close without reply</b> for those.</li>\n<li><b>Hand off or escalate.</b> When something needs the coach or a GM, use <b>Note for coach</b> or <b>Escalate to GM</b> in the conversation. The member still gets a reply from you that says what happens next.</li>\n</ul>\n</section>\n\n<section id=\"pb-route\"><h3>Handle it, check first, or hand off</h3>\n<table class=\"pb-table\"><thead><tr><th>Handle it yourself</th><th>Check the plan first, then handle it</th><th>Hand to the coach (Note for coach)</th></tr></thead>\n<tbody><tr>\n<td><ul><li>Rescheduling, booking, cancelling</li><li>Moving or missed workouts</li><li>Exercise swaps for equipment or preference</li><li>Travel and holiday workouts</li><li>Pausing <i>workouts</i> for a trip, camp or illness</li><li>App and wearable problems</li><li>Simple nutrition questions (snacks, swaps, \"does this count\")</li></ul></td>\n<td><ul><li>Which weight to use: check the member's logged lifts</li><li>Protein and calorie questions: check the Nutrition targets</li><li>Small program tweaks: check the notes first</li></ul></td>\n<td><ul><li>Pain or injury that is sharp, keeps coming back, or lasts into the next day</li><li>Dizziness, chest symptoms or anything medical (mark <b>Urgent</b>)</li><li>Medication, GLP-1s, lab results</li><li>Scan results and what they mean</li><li>Form-check videos</li><li>Changes to program direction, phase or days per week</li><li>Personal and life events</li></ul></td>\n</tr></tbody></table>\n<p>When you hand off, still reply to the member that day. Say their coach will follow up and when, and give them anything safe to do in the meantime. For pain, take the exercise out or swap it to a pain-free option until the coach reviews. Never diagnose.</p>\n</section>\n\n<section id=\"pb-gm\"><h3>When to escalate to a GM</h3>\n<ul>\n<li>Requests to cancel, freeze or pause the <b>membership or billing</b>.</li>\n<li>Any refund that isn't a clear duplicate charge.</li>\n<li>Complaints and upset members.</li>\n<li>Send it to the GM for the member's office: <b>Erin Walsh</b> for SF and Walnut Creek, <b>Marcus Bell</b> for Palo Alto and San Jose.</li>\n<li>Tell the member the GM will reach out within 1 business day. Don't promise a refund or an outcome.</li>\n</ul>\n<p>A short break from <i>workouts</i> with a reason and an end date (a trip, a camp, being sick) is a program change. It is not a membership pause. Handle it yourself with <b>Pause workouts</b> in the Program tab.</p>\n</section>\n\n<section id=\"pb-sched\"><h3>Scheduling rules</h3>\n<ul>\n<li>Offer <b>two specific times</b>, not \"when works for you?\". If the member has already asked for a time and it's free, book it and confirm the date, time and office in one message.</li>\n<li>Book at the member's own office unless they ask for another one. Each member's office is in their Overview.</li>\n<li><b>Progress scans</b> are 5 weeks apart. Anywhere from 4 to 6 weeks after the last scan is fine.</li>\n<li><b>Reschedules are always free.</b></li>\n<li><b>Cancellations less than 24 hours ahead</b> carry a $50 late fee. Waive it for illness or an emergency by ticking \"Waive late fee\" when you cancel.</li>\n<li><b>Running late:</b> the session still ends at its booked time. Reply right away and message the front desk from the appointment in Calendar.</li>\n<li>Coach check-in calls happen on the coach's call calendar. A coach on PTO has no open call slots until they're back.</li>\n</ul>\n</section>\n\n<section id=\"pb-billing\"><h3>Billing</h3>\n<ul>\n<li>You may refund a <b>clear duplicate charge</b> yourself in Billing: the same item, the same amount, the same day. Refund only the extra one.</li>\n<li>Every other refund request goes to the GM.</li>\n<li>Refunds take 5\u201310 business days to show up.</li>\n<li>Receipts (FSA/HSA, expenses) are sent from Billing. Pick the charge the member asked about.</li>\n</ul>\n</section>\n\n<section id=\"pb-offices\"><h3>Offices</h3>\n<table class=\"pb-table\"><thead><tr><th>Office</th><th>Hours</th><th>Parking</th></tr></thead><tbody>\n<tr><td>San Francisco</td><td>Mon\u2013Fri 7 AM\u20137 PM, Sat 7 AM\u20132 PM, closed Sun</td><td>Validated parking in the Harbor Lane garage across the street, level 2. Bring the ticket to the front desk.</td></tr>\n<tr><td>Palo Alto</td><td>Tue\u2013Sun 7 AM\u20136 PM, closed Mon</td><td>Free lot behind the building; any spot marked Kalos.</td></tr>\n<tr><td>San Jose</td><td>Mon\u2013Fri 7 AM\u20137 PM, Sat 7 AM\u201312 PM, closed Sun</td><td>Street parking on Alder St (2-hour limit).</td></tr>\n<tr><td>Walnut Creek</td><td>Tue\u2013Sat 7 AM\u20135 PM, closed Sun\u2013Mon</td><td>Free parking in the Oak Plaza lot.</td></tr>\n</tbody></table>\n</section>\n\n<section id=\"pb-prices\"><h3>Prices and first-scan prep</h3>\n<table class=\"pb-table\"><tbody>\n<tr><td>First DEXA scan</td><td>$150</td></tr><tr><td>Extra progress scan</td><td>$95</td></tr><tr><td>4-week program</td><td>$499</td></tr><tr><td>12-week package</td><td>$1,788</td></tr><tr><td>Monthly membership</td><td>$399 / month</td></tr><tr><td>Nutrition coaching add-on</td><td>$49 / month</td></tr>\n</tbody></table>\n<p><b>Before a DEXA scan:</b></p>\n<ul>\n<li>Wear workout clothes with no metal (zips, underwire, buttons).</li>\n<li>Skip calcium supplements that morning.</li>\n<li>Avoid a hard workout or a big meal in the 2 hours before.</li>\n<li>The scan takes about 10 minutes, and the visit about 45.</li>\n</ul>\n</section>\n\n<section id=\"pb-program\"><h3>Programming basics</h3>\n<ul>\n<li><b>Missed a workout?</b> Do the next workout in order and shift the rest. Don't skip it. Move the days in the Program tab.</li>\n<li><b>Swaps</b> keep the same movement pattern and muscles. For example, one single-leg exercise for another, one vertical pull for another. Apply a swap to the workouts it's meant for: only the trip days for travel, every upcoming workout for a preference.</li>\n<li><b>Travel and holidays:</b> use the \"Hotel \u2013 Dumbbell\" or \"Home \u2013 Bodyweight A/B/C\" workouts on the right dates. Light dumbbells can still be hard work with slower lowering and more reps.</li>\n<li><b>Which weight:</b> go by their heaviest recent weight in Logged lifts. RPE 8 means they could do about 2 more reps.</li>\n<li><b>Logged weights are the total weight.</b> For dumbbells that means both added together: \"DB Bench Press 40 lb\" is a 20 lb dumbbell in each hand.</li>\n<li><b>Protein:</b> use the target already on the member's Nutrition tab. Don't use a rule of thumb that contradicts it.</li>\n</ul>\n</section>\n\n<section id=\"pb-style\"><h3>How we write to members</h3>\n<ul>\n<li>Short, warm and specific, like a real person texting. No scripts or marketing language.</li>\n<li>Use their name. Ask at most one question.</li>\n<li>Always give a next step: what you did, what happens next, and when.</li>\n<li>Confirm dates as day + date + time + office, for example \"Tue Dec 8, 9:00 AM, Palo Alto\".</li>\n<li>Never promise what isn't yours to give (refunds, coach decisions).</li>\n</ul>\n</section>\n";
+</script>
+<script>
+"use strict";
+/* ---------- constants & helpers ---------- */
+const TEST_MS = 60 * 60 * 1000;
+const TODAY = SIM.today;
+const NOW_MIN = 9 * 60;
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const $ = (sel, el = document) => el.querySelector(sel);
+const dow = d => new Date(d + "T12:00:00").getDay();
+const addDays = (d, n) => { const x = new Date(d + "T12:00:00"); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); };
+const fmtD = d => new Date(d + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+const fmtT = t => { let [h, m] = t.split(":").map(Number); const ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12; return `${h}:${String(m).padStart(2, "0")} ${ap}`; };
+const tmin = t => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+const mins = ms => (ms / 60000).toFixed(1);
+const clock = ms => { ms = Math.max(0, ms); const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+const ago = m => m < 60 ? `${m} min ago` : m < 120 ? "1 hour ago" : `${Math.round(m / 60)} hours ago`;
+const first = n => n.split(" ")[0];
+const PASTELS = [["#ffe4e6", "#9f1239"], ["#fce7f3", "#9d174d"], ["#ffedd5", "#9a3412"], ["#ecfccb", "#3f6212"], ["#dcfce7", "#166534"], ["#d1fae5", "#065f46"], ["#ccfbf1", "#115e59"], ["#cffafe", "#155e75"], ["#e0f2fe", "#075985"], ["#dbeafe", "#1e40af"], ["#e0e7ff", "#3730a3"], ["#ede9fe", "#5b21b6"], ["#fae8ff", "#86198f"]];
+const avatar = (name, key) => { let h = 0; for (const c of key || name) h = (h * 31 + c.charCodeAt(0)) >>> 0; const [b, f] = PASTELS[h % PASTELS.length]; return `<span class="av" style="background:${b};color:${f}">${esc(name[0])}</span>`; };
+const TD = Object.fromEntries(TODOS.map(t => [t.id, t]));
+const CH_LABEL = { chat: "Chat", comment: "Workout comment", email: "Email", text: "Text", voicemail: "Voicemail", form: "Website form" };
+const TYPE_LABEL = { scan: "Progress DEXA scan", first: "First DEXA scan", form: "Form session", call: "Check-in call" };
+const emailOf = id => `${MEMBERS[id].name.toLowerCase().replace(/[^a-z]+/g, ".")}@example.com`;
+
+/* ---------- calendars ---------- */
+const CALS = {
+  "dexa-SF": { name: "DEXA · San Francisco", office: "SF", types: ["scan", "first"] },
+  "dexa-PA": { name: "DEXA · Palo Alto", office: "PA", types: ["scan", "first"] },
+  "dexa-SJ": { name: "DEXA · San Jose", office: "SJ", types: ["scan", "first"] },
+  "dexa-WC": { name: "DEXA · Walnut Creek", office: "WC", types: ["scan", "first"] },
+  "calls-nadia": { name: "Check-in calls · Nadia Ortiz", office: "Virtual", types: ["call"] },
+  "calls-owen": { name: "Check-in calls · Owen Lee", office: "Virtual", types: ["call"] },
+  "form-sam": { name: "Form sessions · Sam Rivera (SF)", office: "SF", types: ["form"] },
+};
+function hoursFor(cal, d) {
+  const w = dow(d);
+  const off = { SF: w === 0 ? null : w === 6 ? [420, 840] : [420, 1140], PA: w === 1 ? null : [420, 1080], SJ: w === 0 ? null : w === 6 ? [420, 720] : [420, 1140], WC: (w === 0 || w === 1) ? null : [420, 1020] };
+  if (cal.startsWith("dexa-")) return off[cal.slice(5)];
+  if (cal === "calls-nadia") return (w === 0 || w === 6) ? null : [540, 1080];
+  if (cal === "calls-owen") return (d < "2026-12-09" || w === 0 || w === 6) ? null : [540, 1020];
+  if (cal === "form-sam") return (w === 0 || w === 1) ? null : [480, 840];
+  return null;
+}
+function closedLabel(cal, d) { if (cal === "calls-owen" && d < "2026-12-09") return "PTO"; if (cal === "calls-nadia" || cal === "form-sam") return "Off"; return "Closed"; }
+function calOfAppt(a) { return a.type === "call" ? "calls-" + a.staff : a.type === "form" ? "form-sam" : "dexa-" + a.office; }
+function baseAppts() {
+  const out = APPTS.map(a => ({ ...a, cal: calOfAppt(a) }));
+  for (const [k, times] of Object.entries(TAKEN)) { const [o, d] = k.split("|"); for (const t of times) out.push({ id: `x-${o}-${d}-${t}`, other: "Booked", type: "scan", cal: "dexa-" + o, office: o, date: d, time: t }); }
+  for (const [k, times] of Object.entries(CALL_TAKEN)) { const [c, d] = k.split("|"); for (const t of times) if (!out.some(a => a.cal === "calls-" + c && a.date === d && a.time === t)) out.push({ id: `x-${c}-${d}-${t}`, other: "Booked", type: "call", cal: "calls-" + c, office: "Virtual", date: d, time: t }); }
+  return out;
+}
+function apptAt(cal, d, t) { return S.appts.find(a => a.cal === cal && a.date === d && a.time === t && !a.cancelled); }
+function slotsFor(cal, d) { const h = hoursFor(cal, d); if (!h) return []; const out = []; for (let m = h[0]; m < h[1]; m += 30) out.push(`${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`); return out; }
+const isPast = (d, t) => d < TODAY || (d === TODAY && tmin(t) < NOW_MIN);
+
+/* ---------- programs ---------- */
+function basePattern(m) { const p = {}; const a = MEMBERS[m].program || []; for (let i = 0; i < a.length; i += 2) p[a[i]] = a[i + 1]; return p; }
+function getProgram(m) { if (S.programs[m]) return S.programs[m]; if (!MEMBERS[m].program) return []; return mkProgram(basePattern(m)); }
+function editProgram(m) { if (!S.programs[m]) S.programs[m] = JSON.parse(JSON.stringify(getProgram(m))); return S.programs[m]; }
+function woStatus(m, w) { if (w.paused) return ["Paused", "sky"]; if (w.date < TODAY) return (MEMBERS[m].missed || []).includes(w.date) ? ["Missed", "red"] : ["Done", "green"]; if (w.date === TODAY) return ["Today", "amber"]; return ["Planned", ""]; }
+
+/* ---------- state ---------- */
+const fresh = () => ({ v: 1, phase: "welcome", name: "", session: Math.random().toString(36).slice(2, 10), welcomeAt: Date.now(), pbStart: null, testStart: null, endedAt: null, endReason: null,
+  td: {}, programs: {}, appts: baseAppts(), refunds: [], receipts: [], notes: [], desk: [], awayMs: 0, focusMs: 0, pbMs: 0, ua: navigator.userAgent.slice(0, 160) });
+let S = fresh();
+const tdState = id => (S.td[id] ||= { status: "open", how: null, replies: [], activeMs: 0, opens: 0, firstOpenT: null, doneT: null, why: "", pastes: 0, extPastes: 0, handoffs: 0, tools: {} });
+const doneCount = () => TODOS.filter(t => S.td[t.id]?.status === "done").length;
+const tNow = () => S.testStart ? Date.now() - S.testStart : 0;
+
+/* ---------- persistence (db) ---------- */
+let db = null, user = null, isOwner = false, saveBlocked = false, dbReady = false, ev = [], chunk = 1, chunkEvents = [];
+const writer = { busy: {}, pending: {} };
+async function writeDoc(path, data) {
+  if (!db || saveBlocked) return;
+  if (writer.busy[path]) { writer.pending[path] = data; return; }
+  writer.busy[path] = true;
+  try { await db.doc(path).set(data); }
+  catch (e) {
+    if (e && e.code === "invalid_argument" && !String(e.message || "").includes("256")) { saveBlocked = true; render(); }
+    else if (e && e.code === "unavailable") { setTimeout(() => writeDoc(path, data), 1500 + Math.random() * 1000); }
+    else console.warn("save failed", e);
+  } finally {
+    writer.busy[path] = false;
+    if (writer.pending[path]) { const d = writer.pending[path]; delete writer.pending[path]; writeDoc(path, d); }
+  }
+}
+let saveTimer = null;
+function save(now) { clearTimeout(saveTimer); if (WEB) { if (now) webSaveLocal(); else saveTimer = setTimeout(webSaveLocal, 800); return; } const go = () => writeDoc("attempt/main", { state: JSON.parse(JSON.stringify(S)), chunk, updatedAt: Date.now() }); if (now) go(); else saveTimer = setTimeout(go, 1500); }
+function log(ty, d = {}, todo) {
+  const e = { t: tNow(), w: Date.now(), ph: S.phase, ty, td: todo === undefined ? (UI.open || UI.lastTodo || null) : todo, ...d };
+  if (WEB) { webEv.push(e); webDirty = true; return; }
+  chunkEvents.push(e);
+  if (chunkEvents.length >= 150) { flushEvents(); chunk++; chunkEvents = []; }
+}
+let lastFlushKey = "";
+function flushEvents(force) { if (WEB) { webSaveLocal(); return; } const key = chunk + ":" + chunkEvents.length; if (!chunkEvents.length || (key === lastFlushKey && !force)) return; lastFlushKey = key; writeDoc(`attempt/main/events/c${String(chunk).padStart(4, "0")}`, { chunk, events: chunkEvents.slice() }); }
+setInterval(() => { if (S.phase !== "welcome") flushEvents(); }, 8000);
+
+/* ---------- web mode (no sign-in): progress kept in this browser, copies sent to a Jotform form ---------- */
+const WEB = {"formId": "263245083765058", "url": "https://submit.jotform.com/submit/263245083765058", "fields": {"name": "q2_q2_textbox0", "email": "q3_q3_textbox1", "attempt": "q4_q4_textbox2", "code": "q5_q5_textbox3", "reason": "q6_q6_textbox4", "done": "q7_q7_textbox5", "phase": "q8_q8_textbox6", "snap": ["q9_q9_textarea7", "q11_snapshot2", "q12_snapshot3", "q13_snapshot4"]}, "chunk": 60000, "every": 180000};
+const QS = new URLSearchParams(location.search);
+const REVIEW = !!WEB && QS.has("review");
+const CAND_CODE = (QS.get("c") || "").replace(/[^\w.-]/g, "").slice(0, 40);
+const LS_KEY = "msc-shift-v2" + (CAND_CODE ? ":" + CAND_CODE : "");
+let webEv = [], webDirty = false, webLastSend = 0, webSending = null, webQueued = null, webLsOk = true;
+function lsGet() { try { return JSON.parse(localStorage.getItem(LS_KEY) || "null"); } catch (_) { return null; } }
+function webSaveLocal() { if (REVIEW) return; webDirty = true; try { localStorage.setItem(LS_KEY, JSON.stringify({ state: S, events: webEv, savedAt: Date.now() })); webLsOk = true; } catch (_) { webLsOk = false; } }
+async function gzB64(str) {
+  if (!window.CompressionStream) return "b64:" + btoa(unescape(encodeURIComponent(str)));
+  const buf = await new Response(new Blob([str]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer();
+  const b = new Uint8Array(buf); let out = ""; for (let i = 0; i < b.length; i += 0x8000) out += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+  return "gz:" + btoa(out);
+}
+async function unB64(txt) {
+  txt = String(txt || "").replace(/\s+/g, "");
+  if (txt.startsWith("b64:")) return decodeURIComponent(escape(atob(txt.slice(4))));
+  const bin = atob(txt.replace(/^gz:/, "")), b = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
+  return await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream("gzip"))).text();
+}
+// Sends the whole attempt (state + every logged event). The newest submission per attempt ID is the full record.
+function webSend(reason) {
+  if (!WEB || REVIEW || S.phase === "welcome") return Promise.resolve(false);
+  if (webSending) { webQueued = reason; return webSending; }
+  webDirty = false; webLastSend = Date.now();
+  webSending = (async () => {
+    let ok = false;
+    try {
+      const F = WEB.fields, cap = WEB.chunk * F.snap.length;
+      let events = webEv, enc = "", dropped = 0;
+      for (let i = 0; i < 6; i++) {
+        enc = await gzB64(JSON.stringify({ v: 2, reason, sentAt: Date.now(), code: CAND_CODE, dropped, state: S, events }));
+        if (enc.length <= cap) break;
+        // Not expected in a real hour. First drop text the state already holds (reasoning drafts), then the oldest events.
+        if (i === 0) events = events.map(e => e.ty === "why" ? { ...e, text: undefined, len: (e.text || "").length } : e);
+        else { const cut = Math.ceil(events.length / 4); events = events.slice(cut); dropped += cut; }
+      }
+      const f = new FormData();
+      f.append("formID", WEB.formId); f.append("simple_spc", WEB.formId + "-" + WEB.formId); f.append("website", "");
+      f.append(F.name, S.name || ""); f.append(F.email, S.email || ""); f.append(F.attempt, S.session); f.append(F.code, CAND_CODE);
+      f.append(F.reason, reason); f.append(F.done, String(doneCount())); f.append(F.phase, S.phase);
+      F.snap.forEach((k, i) => f.append(k, enc.slice(i * WEB.chunk, (i + 1) * WEB.chunk)));
+      await fetch(WEB.url, { method: "POST", mode: "no-cors", body: f, keepalive: enc.length < 45000 });
+      ok = true;
+    } catch (e) { webDirty = true; console.warn("send failed", e); }
+    webSending = null;
+    if (webQueued) { const q = webQueued; webQueued = null; return webSend(q); }
+    return ok;
+  })();
+  return webSending;
+}
+setInterval(() => { if (WEB && S.phase === "test" && webDirty && Date.now() - webLastSend > WEB.every) webSend("interval"); }, 15000);
+
+/* ---------- UI state ---------- */
+const UI = { view: "home", open: null, lastTodo: null, rtab: "overview", handoff: null, side: null, calId: "dexa-SF", calWeek: "2026-12-05", billCust: "victor", openWo: null, showDone: false, confirm: null, resultsData: null };
+
+/* ---------- boot ---------- */
+async function boot() {
+  render();
+  if (WEB) {
+    if (REVIEW) { isOwner = true; UI.review = true; dbReady = true; render(); return; }
+    if (QS.has("reset")) { try { localStorage.removeItem(LS_KEY); } catch (_) { } QS.delete("reset"); history.replaceState(null, "", location.pathname + (QS.toString() ? "?" + QS : "")); }
+    const d = lsGet();
+    if (d && d.state) { S = Object.assign(fresh(), d.state); webEv = d.events || []; log("reload", { phase: S.phase }); }
+    try { localStorage.setItem(LS_KEY + ":probe", "1"); localStorage.removeItem(LS_KEY + ":probe"); } catch (_) { webLsOk = false; }
+    dbReady = true; render();
+    if (S.phase === "done" && !S.sentFinal) sendFinal();
+    return;
+  }
+  const c = window.claude;
+  if (!c || !c.use) { dbReady = true; render(); return; }
+  try {
+    [db, user] = await Promise.all([c.use("db"), c.use("user")]);
+    if (user) isOwner = await user.isOwner().catch(() => false);
+    if (db) {
+      const snap = await Promise.race([db.doc("attempt/main").get(), new Promise(r => setTimeout(() => r(null), 10000))]);
+      if (snap && snap.exists) {
+        const d = snap.data();
+        if (d.state) { S = Object.assign(fresh(), JSON.parse(JSON.stringify(d.state))); chunk = (d.chunk || 1) + 1; }
+        log("reload", { phase: S.phase });
+      }
+    }
+  } catch (e) { console.warn(e); }
+  dbReady = true;
+  render();
+}
+
+/* ---------- timers ---------- */
+let lastTick = Date.now(), hiddenAt = null;
+setInterval(() => {
+  const now = Date.now(), dt = Math.min(5000, now - lastTick); lastTick = now;
+  const visible = !document.hidden && document.hasFocus();
+  if (S.phase === "playbook" && visible) S.pbMs += dt;
+  if (S.phase === "test") {
+    if (visible) { S.focusMs += dt; const cur = UI.open || ((UI.view === "calendar" || UI.view === "billing") ? UI.lastTodo : null); if (cur) tdState(cur).activeMs += dt; if (!UI.open) S.viewMs = Object.assign(S.viewMs || {}, { [UI.view]: ((S.viewMs || {})[UI.view] || 0) + dt }); }
+    if (UI.view === "playbook" && visible) S.pbInTestMs = (S.pbInTestMs || 0) + dt;
+    if (tNow() >= TEST_MS) finish("time");
+    const el = $("#timer"); if (el) { const left = TEST_MS - tNow(); el.textContent = clock(left); el.classList.toggle("warn", left < 10 * 60000); }
+  }
+}, 1000);
+document.addEventListener("visibilitychange", () => {
+  if (S.phase !== "test" && S.phase !== "playbook") return;
+  if (document.hidden) { hiddenAt = Date.now(); log("tab_hidden"); flushEvents(); save(true); if (WEB && S.phase === "test" && Date.now() - webLastSend > 20000) webSend("hidden"); }
+  else if (hiddenAt) { const d = Date.now() - hiddenAt; S.awayMs += d; log("tab_visible", { awayMs: d }); hiddenAt = null; save(); }
+});
+window.addEventListener("blur", () => { if (S.phase === "test") log("window_blur"); });
+window.addEventListener("focus", () => { if (S.phase === "test") log("window_focus"); });
+
+/* copy/paste tracking */
+let internalCopies = [];
+document.addEventListener("copy", () => { const s = String(window.getSelection() || ""); if (s) { internalCopies.push(s.trim()); internalCopies = internalCopies.slice(-30); } });
+document.addEventListener("paste", e => {
+  if (S.phase !== "test") return;
+  const txt = (e.clipboardData && e.clipboardData.getData("text")) || "";
+  const internal = internalCopies.some(c => c && (txt.trim() === c || c.includes(txt.trim()) || txt.includes(c)));
+  const id = UI.open; if (id) { const s = tdState(id); s.pastes++; if (!internal) s.extPastes++; }
+  log("paste", { len: txt.length, internal, sample: txt.slice(0, 300) });
+  save();
+});
+
+/* ---------- render root ---------- */
+function render() {
+  const app = $("#app"), keep = captureInputs(app);
+  if (UI.ownerResults) app.innerHTML = shellView();
+  else if (UI.review) app.innerHTML = reviewView();
+  else if (S.phase === "welcome") app.innerHTML = welcomeView();
+  else if (S.phase === "playbook") app.innerHTML = playbookIntroView();
+  else if (S.phase === "done") app.innerHTML = doneView();
+  else app.innerHTML = shellView();
+  restoreInputs(app, keep);
+  renderLayer();
+}
+function renderLayer() {
+  const L = $("#layer"); let h = "";
+  if (S.phase === "test") {
+    if (UI.open) h += convoView(UI.open);
+    if (UI.side) h += sideView();
+  }
+  if (UI.confirm) h += confirmView();
+  if (UI.toast) h += `<div class="toast" role="status">${esc(UI.toast)}</div>`;
+  const keep = captureInputs(L);
+  L.innerHTML = h;
+  restoreInputs(L, keep);
+  const th = $(".dlg .thread", L); if (th && UI.scrollThread) { th.scrollTop = th.scrollHeight; UI.scrollThread = false; }
+}
+// keep typed text across re-renders of the overlay
+function captureInputs(root) { const m = {}; root.querySelectorAll("[id]").forEach(el => { if ("value" in el && el.type !== "checkbox" && el.type !== "radio") m[el.id] = [el.value, el === document.activeElement, el.selectionStart]; else if (el.type === "checkbox" || el.type === "radio") m[el.id] = [el.checked, false, null, true]; }); return m; }
+function restoreInputs(root, m) { for (const [id, [v, foc, sel, chk]] of Object.entries(m)) { const el = root.querySelector("#" + CSS.escape(id)); if (!el || el.dataset.reset) continue; if (chk) el.checked = v; else { el.value = v; if (foc) { el.focus(); try { el.setSelectionRange(sel, sel); } catch (_) { } } } } }
+let toastT; function toast(msg) { UI.toast = msg; renderLayer(); clearTimeout(toastT); toastT = setTimeout(() => { UI.toast = null; renderLayer(); }, 2200); }
+
+/* ---------- welcome / playbook / done ---------- */
+function saveWarning() {
+  if (WEB) return webLsOk ? "" : `<div class="card" style="padding:12px 16px;border-color:var(--amber-bd);background:var(--amber-bg);color:var(--amber-fg)"><b>This browser is blocking site storage</b> (often a private window). Your answers are still sent to us, but refreshing the page would lose your place. Use a normal window if you can.</div>`;
+  if (!dbReady) return `<div class="card card-b" style="padding:12px 16px">Connecting…</div>`;
+  if (!db) return `<div class="card" style="padding:12px 16px;border-color:var(--amber-bd);background:var(--amber-bg);color:var(--amber-fg)"><b>Your work can't be saved in this view.</b> Open the test from the link you were sent, signed in to claude.ai with the email it was sent to. If you can't, reply to the email you got the link in.</div>`;
+  return "";
+}
+function welcomeView() {
+  return `<div class="wrap"><div class="intro">
+  <div class="logo"><span class="logo-tile">I</span><span>Iris · training environment</span></div>
+  <h1>MSC shift simulation</h1>
+  <p class="lead">You'll work a real-feeling shift as a Kalos Member Success Coach: 30 to-dos from members and the support inbox, in a copy of the tools our MSCs use. All the people and data in it are made up.</p>
+  ${saveWarning()}
+  ${isOwner ? ownerBox() : ""}
+  <div class="card card-b" style="padding:16px;display:grid;gap:14px">
+    <div class="steps">
+      <div class="step"><b class="n">1</b><div><b>Read the playbook.</b> It's the policy for this shift: what to handle, what to hand off, scheduling and billing rules. Take the time you need. It isn't part of the 60 minutes, and it stays open in a tab during the shift.</div></div>
+      <div class="step"><b class="n">2</b><div><b>Work the shift: 30 to-dos in 60 minutes.</b> The clock starts when you click Start shift and can't be paused. Most people won't finish them all, so work in the order you think matters most. Reply to members, use Calendar, Billing and each member's Program, and hand off or escalate when the playbook says so. Click Finish when you're done; at 60 minutes the test finishes itself.</div></div>
+    </div>
+    <div><b>Ground rules</b>
+    <ul class="rules">
+      <li>Work on your own. Don't use ChatGPT, Claude or any other AI tool, and don't ask anyone for help. We want to see how you write.</li>
+      <li>Each conversation has a <b>Your reasoning</b> box. It's optional: a line on why you replied the way you did. Only the hiring team sees it.</li>
+      <li>You can edit a message after you send it.</li>
+      <li>We record what you do: time on each to-do, what you type and send, the tools you use, pasted text, and time spent away from this tab.</li>
+      <li>${WEB ? "No account or sign-in needed. Your work is saved as you go: refreshing is safe, but stay in the same browser on the same computer until you finish." : "Refreshing is safe; your work is saved as you go."} Use a laptop or desktop browser.</li>
+    </ul></div>
+    <div style="display:grid;gap:6px;max-width:360px"><label for="cand-name">Your full name</label><input id="cand-name" type="text" autocomplete="name" placeholder="First and last name"></div>
+    ${WEB ? `<div style="display:grid;gap:6px;max-width:360px"><label for="cand-email">The email you applied with</label><input id="cand-email" type="email" autocomplete="email" placeholder="you@example.com"></div>` : ""}
+    <div><button class="btn primary" data-a="to-playbook">Open the playbook</button></div>
+  </div></div></div>`;
+}
+function ownerBox() {
+  const st = S.phase === "welcome" && !S.name ? "No attempt yet." : `Attempt by <b>${esc(S.name || "?")}</b>: ${esc(S.phase)}${S.testStart ? `, ${doneCount()}/30 done` : ""}.`;
+  return `<div class="card" style="padding:12px 16px;display:grid;gap:8px"><div><b>You own this test.</b> Candidates don't see this box. ${st}</div>
+  <div class="comp-actions"><button class="btn sm" data-a="owner-results">View results</button><button class="btn sm danger" data-a="owner-reset">Reset attempt</button></div>
+  <div class="small muted">If you click through the test yourself, that run is saved as the attempt. Reset it before you share the link.</div></div>`;
+}
+function playbookIntroView() {
+  return `<div class="top"><div class="wrap top-in max"><div class="logo"><span class="logo-tile">I</span>Playbook</div><span class="spacer"></span>
+   <span class="small muted">Not timed. Start the shift when you're ready.</span><button class="btn primary" data-a="start-test">Start shift (60 min)</button></div></div>
+   <main class="wrap"><div class="max">${saveBlockedBanner()}<div class="pb pb-wrap">${PLAYBOOK_HTML}</div>
+   <div style="padding:20px 0"><button class="btn primary" data-a="start-test">I've read it. Start the 60-minute shift</button></div></div></main>`;
+}
+function doneView() {
+  const used = S.endedAt && S.testStart ? S.endedAt - S.testStart : 0;
+  return `<div class="wrap"><div class="intro"><div class="logo"><span class="logo-tile">I</span>Iris · training environment</div>
+  <h1>Shift finished. Thank you${S.name ? ", " + esc(first(S.name)) : ""}!</h1>
+  <p class="lead">${S.endReason === "time" ? "The 60 minutes ran out, so the test finished itself." : "You finished the shift."} You completed ${doneCount()} of 30 to-dos in ${clock(used)}. ${WEB ? webFinalText() : "Your work is saved; you can close this tab. We'll be in touch."}</p>
+  ${WEB && UI.webFinal === "failed" ? `<div class="card" style="padding:12px 16px;display:grid;gap:10px;background:var(--amber-bg);border-color:var(--amber-bd);color:var(--amber-fg)"><div><b>We couldn't send your answers.</b> Check your internet connection and try again. Keep this tab open: your answers are still here.</div><div><button class="btn primary sm" data-a="web-resend">Send again</button></div></div>` : ""}
+  ${saveBlocked ? `<div class="card" style="padding:12px 16px;background:var(--amber-bg);border-color:var(--amber-bd);color:var(--amber-fg)">Your answers couldn't be saved. Please reply to the email you got the link in.</div>` : ""}
+  ${isOwner ? ownerBox() : ""}</div></div>`;
+}
+function webFinalText() {
+  if (UI.webFinal === "sending") return "Sending your answers… keep this tab open for a moment.";
+  if (UI.webFinal === "failed") return "";
+  return "Your answers have been sent; you can close this tab. We'll be in touch.";
+}
+/* Review mode (?review): paste a Jotform submission's Snapshot fields to see the Results view. Holds no answers itself. */
+function reviewView() {
+  return `<div class="wrap"><div class="intro"><div class="logo"><span class="logo-tile">I</span>Iris · results review</div>
+  <h1>Review an attempt</h1>
+  <p class="lead">Open the attempt's newest submission in Jotform (highest "To-dos done", Save reason "finish") and paste its Snapshot fields below, in order. Empty ones can stay empty.</p>
+  <div class="card card-b" style="padding:16px;display:grid;gap:10px">
+   ${[1, 2, 3, 4].map(i => `<div style="display:grid;gap:6px"><label for="rv-${i}">Snapshot${i > 1 ? " " + i : ""}</label><textarea id="rv-${i}" rows="3" spellcheck="false"></textarea></div>`).join("")}
+   <div><button class="btn primary" data-a="review-load">Show results</button></div>
+   ${UI.reviewErr ? `<div class="small" style="color:var(--red-fg,#b42318)">${esc(UI.reviewErr)}</div>` : ""}
+  </div></div></div>`;
+}
+function saveBlockedBanner() { return saveBlocked ? `<div class="banner" style="border-radius:8px;padding:8px 12px;margin-bottom:12px">Your work isn't being saved: this link doesn't let you write. Tell the person who sent it before you continue.</div>` : ""; }
+
+/* ---------- shell ---------- */
+function shellView() {
+  const supportOpen = TODOS.filter(t => PLACE[t.id]?.support && S.td[t.id]?.status !== "done").length;
+  const inboxOpen = TODOS.filter(t => !PLACE[t.id]?.support && S.td[t.id]?.status !== "done").length;
+  const nav = [["home", "Home", inboxOpen], ["support", "Support", supportOpen], ["calendar", "Calendar"], ["billing", "Billing"], ["playbook", "Playbook"]];
+  if (isOwner && UI.ownerResults) nav.push(["results", "Results"]);
+  const left = TEST_MS - tNow();
+  return `<div class="top"><div class="wrap top-in"><div class="logo"><span class="logo-tile">I</span>Iris</div>
+  <nav class="nav">${nav.map(([k, l, c]) => `<button data-a="nav" data-v="${k}" class="${UI.view === k ? "on" : ""}">${l}${c ? `<span class="count">${c}</span>` : ""}</button>`).join("")}</nav>
+  <span class="spacer"></span>
+  ${S.phase === "test" ? `<span class="prog">${doneCount()}/30 done</span><span id="timer" class="timer ${left < 600000 ? "warn" : ""}" title="Time left">${clock(left)}</span><button class="btn" data-a="finish">Finish</button>` : `<span class="prog">Owner view</span>`}
+  </div></div>
+  ${saveBlocked ? `<div class="banner"><div class="wrap">Your work isn't being saved: this link doesn't let you write. Tell the person who sent it.</div></div>` : ""}
+  <main class="wrap"><div class="max">${viewBody()}</div></main>`;
+}
+function viewBody() {
+  switch (UI.view) {
+    case "home": return homeView();
+    case "support": return supportView();
+    case "calendar": return calendarView();
+    case "billing": return billingView();
+    case "playbook": return `<div class="card" style="padding:4px 20px"><div class="pb pb-wrap">${PLAYBOOK_HTML}</div></div>`;
+    case "results": return resultsView();
+  }
+  return "";
+}
+
+/* ---------- inbox ---------- */
+function rowHTML(t) {
+  const m = MEMBERS[t.m], st = S.td[t.id], done = st?.status === "done", p = PLACE[t.id] || {};
+  const last = t.thread[t.thread.length - 1][1];
+  const prefix = t.ch === "comment" ? `A workout (${t.topic}): ` : "";
+  const btn = p.flag ? "Reply" : p.support ? "Open" : "Reply in a group";
+  const band = t.ago > 24 * 60 ? "amber" : "";
+  return `<div class="row ${band} ${done ? "done" : ""}">${avatar(m.name, t.m)}
+   <div class="row-main"><div class="row-name">${esc(m.name)}${p.flag ? `<span class="chip ${p.flag.startsWith("Refund") ? "red" : "amber"}">${esc(p.flag)}</span>` : ""}${p.support ? `<span class="chip">${CH_LABEL[t.ch]}</span>` : t.ch === "comment" ? `<span class="chip">Comment</span>` : ""}${done ? `<span class="chip green">${st.how === "noreply" ? "Closed" : "Replied"}</span>` : ""}${st?.handoffs ? `<span class="chip sky">Handed off</span>` : ""}</div>
+   <div class="row-prev">${p.support && t.subject ? `<b>${esc(t.subject)}</b> · ` : ""}${esc(prefix + last)}</div></div>
+   <div class="row-side"><span class="when">${ago(t.ago)}</span><button class="btn sm" data-a="open" data-id="${t.id}">${done ? "View" : btn}</button></div></div>`;
+}
+function homeView() {
+  const open = TODOS.filter(t => !PLACE[t.id]?.support);
+  const live = open.filter(t => S.td[t.id]?.status !== "done").sort((a, b) => a.ago - b.ago);
+  const flagged = live.filter(t => PLACE[t.id]?.flag);
+  const by = c => live.filter(t => !PLACE[t.id]?.flag && MEMBERS[t.m].coach === c);
+  const done = open.filter(t => S.td[t.id]?.status === "done");
+  const sec = (title, list, extra = "") => list.length ? `<div class="sec-h">${title}${extra}</div><div class="rows">${list.map(rowHTML).join("")}</div>` : "";
+  return `<div class="card"><div class="card-h">Inbox <span class="small muted" style="font-weight:400">${esc(SIM.label)}</span></div><div class="card-b">
+   ${!live.length ? `<div class="empty">Nothing waiting</div>` : ""}
+   ${sec("Reply as the coach", flagged)}
+   ${sec("Nadia Ortiz · back Mon", by("nadia"))}
+   ${sec("Owen Lee · back Wed Dec 9", by("owen"))}
+   ${done.length ? `<div class="sec-h"><button class="btn ghost sm" data-a="toggle-done">${UI.showDone ? "Hide" : "Show"} done (${done.length})</button></div>${UI.showDone ? `<div class="rows">${done.map(rowHTML).join("")}</div>` : ""}` : ""}
+  </div></div>`;
+}
+function supportView() {
+  const all = TODOS.filter(t => PLACE[t.id]?.support);
+  const live = all.filter(t => S.td[t.id]?.status !== "done").sort((a, b) => a.ago - b.ago);
+  const done = all.filter(t => S.td[t.id]?.status === "done");
+  return `<div class="card"><div class="card-h">Support inbox <span class="small muted" style="font-weight:400">Email, texts, voicemail and website forms for all offices</span></div><div class="card-b">
+  ${live.length ? `<div class="rows">${live.map(rowHTML).join("")}</div>` : `<div class="empty">Nothing waiting</div>`}
+  ${done.length ? `<div class="sec-h">Done</div><div class="rows">${done.map(rowHTML).join("")}</div>` : ""}</div></div>`;
+}
+
+/* ---------- conversation dialog ---------- */
+function convoView(id) {
+  const t = TD[id], m = MEMBERS[t.m], p = PLACE[id] || {}, st = tdState(id);
+  const coach = m.coach ? STAFF[m.coach] : null;
+  let title, sub;
+  if (p.support) { title = m.name; sub = `${CH_LABEL[t.ch]} · ${esc(p.from)}${t.subject ? ` · “${esc(t.subject)}”` : ""}`; }
+  else if (p.flag) { title = m.name; sub = `${esc(coach.name)}'s chat`; }
+  else { title = `${m.name} · group`; sub = `${esc(m.name)}, ${esc(coach.name)} (coach) and you`; }
+  const msgs = t.thread.map(([who, text, x, minAgo]) => {
+    if (who === "m") return `<div class="msg"><span class="meta">${esc(m.name)}${x === "fwd" ? " · Forwarded from 1:1" : ""} · ${ago(t.ago)}</span>${t.ch === "comment" ? `<span class="chip" style="margin-bottom:4px">${esc(t.topic)}</span>\n` : ""}${esc(text)}${t.video ? `<div class="video">▶ ${esc(t.video)} <span class="muted">(video)</span></div>` : ""}</div>`;
+    return "";
+  }).join("");
+  const mine = st.replies.map((r, i) => UI.editing === id + ":" + i
+    ? `<div class="msg-edit"><textarea id="edit-${id}-${i}" rows="4" aria-label="Edit message">${esc(r.text)}</textarea><div class="comp-actions"><button class="btn primary sm" data-a="edit-save" data-i="${i}">Save edit</button><button class="btn ghost sm" data-a="edit-x">Cancel</button></div></div>`
+    : `<div class="msg me"><span class="meta">${r.asCoach ? "Sent as " + esc(r.asCoach) : "You"} · ${r.via}${r.edits && r.edits.length ? " · edited" : ""}</span>${esc(r.text)}<span class="edit-l"><button data-a="edit-open" data-i="${i}">Edit</button></span></div>`).join("");
+  const notes = S.notes.filter(n => n.todo === id).map(n => `<div class="sys">${n.kind === "gm" ? "Escalated to " : n.kind === "desk" ? "Messaged front desk " : "Note for "}${esc(n.toName)}${n.urgent ? " · Urgent" : ""}: “${esc(n.text.slice(0, 120))}${n.text.length > 120 ? "…" : ""}”</div>`).join("");
+  const closed = st.status === "done" && st.how === "noreply" ? `<div class="sys">Closed without reply</div>` : "";
+  const via = p.support ? (t.ch === "email" || t.ch === "form" ? "Reply by email" : "Reply by text") : p.flag ? "" : "";
+  const sugg = SUGGEST[id] && !st.suggDismissed ? `<div class="pill">Suggested saved reply: ${esc(SUGGEST[id])}<button data-a="use-saved" data-k="${esc(SUGGEST[id])}" title="Add to draft">Add</button><button data-a="dismiss-sugg" aria-label="Dismiss">×</button></div>` : "";
+  return `<div class="overlay" data-a="overlay-bg"><div class="dlg" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+   <div class="pane"><div class="pane-h">${avatar(m.name, t.m)}<div style="min-width:0;flex:1"><div class="ttl">${esc(title)}</div><div class="small muted">${sub}</div></div>
+     ${p.flag ? `<span class="chip ${p.flag.startsWith("Refund") ? "red" : "amber"}">${esc(p.flag)}</span>` : ""}
+     <button class="btn sm" data-a="handoff" data-k="coach" ${coach ? "" : "disabled"}>Note for coach</button><button class="btn sm" data-a="handoff" data-k="gm">Escalate to GM</button><button class="btn sm ghost" data-a="close" aria-label="Close">✕</button></div>
+    ${p.flag ? `<div class="asbar" style="margin:8px 12px 0">Replying as <b>${esc(coach.name)}</b>. ${esc(first(m.name))} will see ${esc(first(coach.name))}'s name and photo.</div>` : ""}
+    <div class="thread">${msgs}${mine}${notes}${closed}</div>
+    ${UI.handoff ? handoffForm(id) : ""}
+    <div class="composer">${sugg}
+     ${UI.slash ? slashMenu() : ""}
+     <textarea id="reply-${id}" rows="4" placeholder="${p.support ? `${via}…` : p.flag ? `Message ${esc(first(m.name))} as ${esc(first(coach.name))}…` : "Message the group…"} (type / for saved replies)" data-a-input="reply"></textarea>
+     <div class="comp-actions"><button class="btn primary" data-a="send">Send</button>${st.status !== "done" ? `<button class="btn ghost" data-a="noreply">Close without reply</button>` : `<span class="small muted">Done. You can still send or hand off.</span>`}</div>
+     <div class="why"><label for="why-${id}" class="small"><b>Your reasoning</b> <span class="muted">(optional, only the hiring team sees this)</span></label><textarea id="why-${id}" rows="2" data-a-input="why" placeholder="Why you replied or acted this way">${esc(st.why || "")}</textarea></div>
+    </div></div>
+   <div class="pane">${memberPanel(t.m, id)}</div>
+  </div></div>`;
+}
+function slashMenu() { const q = (UI.slashQ || "").toLowerCase(); const keys = Object.keys(SAVED_REPLIES).filter(k => k.toLowerCase().includes(q)); return `<div class="slash"><div class="small muted" style="padding:4px 9px">Kalos saved replies</div>${keys.map(k => `<button data-a="use-saved" data-k="${esc(k)}">${esc(k)}</button>`).join("") || `<div class="small muted" style="padding:6px 9px">No match</div>`}</div>`; }
+function handoffForm(id) {
+  const t = TD[id], m = MEMBERS[t.m], k = UI.handoff;
+  const opts = k === "coach" ? [[m.coach, STAFF[m.coach].name + " (coach)"], ["sam", "Sam Rivera (coach, working today)"]] : [["erin", "Erin Walsh · GM SF + Walnut Creek"], ["marcus", "Marcus Bell · GM Palo Alto + San Jose"]];
+  return `<div class="hand"><b class="small">${k === "coach" ? "Leave a note for the coach" : "Escalate to a GM"}</b>
+   <div class="comp-actions"><select id="ho-to" aria-label="Send to">${opts.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join("")}</select>
+   <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="ho-urgent"> Urgent</label></div>
+   <textarea id="ho-text" rows="3" placeholder="What happened, what you told the member, what they need from them"></textarea>
+   <div class="comp-actions"><button class="btn primary sm" data-a="handoff-send">Send note</button><button class="btn ghost sm" data-a="handoff-cancel">Cancel</button></div></div>`;
+}
+
+/* ---------- member panel ---------- */
+function memberPanel(mid, todoId) {
+  const m = MEMBERS[mid];
+  const tabs = (m.lead || !m.program) ? [["overview", "Overview"]] : [["overview", "Overview"], ["oneonone", m.coach ? `${first(STAFF[m.coach].name)}'s 1:1` : "1:1"], ["program", "Program"], ["lifts", "Logged lifts"], ["nutrition", "Nutrition"]];
+  if (!tabs.some(([k]) => k === UI.rtab)) UI.rtab = "overview";
+  let body = "";
+  if (UI.rtab === "overview") body = overviewTab(mid);
+  else if (UI.rtab === "oneonone") body = oneOnOneTab(mid);
+  else if (UI.rtab === "program") body = programTab(mid);
+  else if (UI.rtab === "lifts") body = liftsTab(mid);
+  else if (UI.rtab === "nutrition") body = `<dl class="kv"><dt>Protein</dt><dd>${esc(m.protein)} / day</dd><dt>Calories</dt><dd>${esc(m.calories)} / day</dd><dt>Body weight</dt><dd>${m.weight} lb</dd><dt>Goal</dt><dd>${esc(m.goal)}</dd><dt>Set by</dt><dd>${esc(STAFF[m.coach].name)}</dd></dl>`;
+  return `<div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button role="tab" class="${UI.rtab === k ? "on" : ""}" data-a="rtab" data-v="${k}">${esc(l)}</button>`).join("")}</div><div class="tab-b">${body}</div>`;
+}
+function upcoming(mid) { return S.appts.filter(a => a.member === mid && !a.cancelled && (a.date > TODAY || (a.date === TODAY && tmin(a.time) >= NOW_MIN - 30))).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)); }
+function apptLine(a) { return `${TYPE_LABEL[a.type]} · ${fmtD(a.date)}, ${fmtT(a.time)} · ${a.office === "Virtual" ? "Virtual" : OFFICES[a.office].name}${a.type === "call" || a.type === "form" ? ` · ${esc(STAFF[a.cal === "form-sam" ? "sam" : a.staff].name)}` : ""}`; }
+function overviewTab(mid) {
+  const m = MEMBERS[mid], up = upcoming(mid);
+  return `<dl class="kv">
+   <dt>Membership</dt><dd>${m.lead ? `<span class="chip">Lead, not a member</span>` : `<span class="chip green">Active</span>`}</dd>
+   <dt>Contact</dt><dd>${esc(PLACE[Object.keys(PLACE).find(k => TD[k].m === mid)]?.from || emailOf(mid))}</dd>
+   <dt>Office</dt><dd>${esc(OFFICES[m.office].name)}</dd>
+   ${m.coach ? `<dt>Coach</dt><dd>${esc(STAFF[m.coach].name)} · <span class="muted">${esc(STAFF[m.coach].status)}</span></dd>` : ""}
+   <dt>Current focus</dt><dd>${esc(m.goal)}</dd>
+   ${m.lastScan ? `<dt>Last scan</dt><dd>${esc(m.lastScan)}</dd>` : ""}
+   <dt>Upcoming</dt><dd>${up.length ? up.map(a => `<div>${apptLine(a)}</div>`).join("") : `<span class="muted">Nothing booked</span>`}</dd>
+   <dt>Notes</dt><dd>${(m.notes || []).length ? m.notes.map(n => `<div>• ${esc(n)}</div>`).join("") : `<span class="muted">None</span>`}</dd>
+  </dl>
+  <div class="comp-actions" style="margin-top:12px"><button class="btn sm" data-a="goto-cal" data-m="${mid}">Open ${esc(OFFICES[m.office].name)} calendar</button>${BILLING[mid] ? `<button class="btn sm" data-a="goto-bill" data-m="${mid}">Open in Billing</button>` : ""}</div>`;
+}
+function oneOnOneTab(mid) {
+  const m = MEMBERS[mid], c = STAFF[m.coach];
+  const th = ONE_ON_ONE[mid] || [["c", `Nice work this week ${first(m.name)}! Let me know if anything feels off.`, "Tue 4:10 PM"], ["m", "Will do, thanks!", "Tue 6:02 PM"]];
+  return `<div class="small muted" style="margin-bottom:8px">${esc(c.name)}'s chat with ${esc(m.name)}. Read only. Your reply goes to the group.</div>
+  <div style="display:flex;flex-direction:column;gap:8px">${th.map(([w, x, when]) => `<div class="msg ${w === "c" ? "me" : ""}" style="${w === "c" ? "align-self:flex-end" : ""}"><span class="meta">${w === "c" ? esc(c.name) : esc(m.name)} · ${esc(when)}</span>${esc(x)}</div>`).join("")}</div>`;
+}
+function liftsTab(mid) {
+  const h = MEMBERS[mid].history;
+  if (!h) { const pr = getProgram(mid).filter(w => w.date < TODAY).slice(-2); return pr.length ? `<table class="t"><thead><tr><th>Workout</th><th>Date</th><th>Logged</th></tr></thead><tbody>${pr.map(w => `<tr><td>${esc(w.name)}</td><td>${fmtD(w.date)}</td><td class="muted">${(MEMBERS[mid].missed || []).includes(w.date) ? "Not logged (missed)" : "Logged, no notes"}</td></tr>`).join("")}</tbody></table>` : `<div class="muted">No logged lifts yet.</div>`; }
+  return `<div class="small muted" style="margin-bottom:8px">Weights are the total lifted. For dumbbells that's both added together: 40 lb = 20 lb in each hand.</div><table class="t"><thead><tr><th>Exercise</th><th>Date</th><th>Sets</th><th>Effort</th></tr></thead><tbody>${h.map(r => `<tr>${r.map(x => `<td>${esc(x)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+}
+function programTab(mid) {
+  const prog = getProgram(mid).slice().sort((a, b) => a.date.localeCompare(b.date));
+  const weeks = {}; for (const w of prog) { const wk = addDays(w.date, -((dow(w.date) + 6) % 7)); (weeks[wk] ||= []).push(w); }
+  const tplOpts = Object.keys(TEMPLATES).map(k => `<option>${esc(k)}</option>`).join("");
+  const changes = (S.progLog || []).filter(c => c.m === mid);
+  return `<div class="comp-actions" style="margin-bottom:10px">
+   <button class="btn sm" data-a="prog-add-open">+ Add workout</button><button class="btn sm" data-a="prog-pause-open">Pause workouts</button>
+   ${S.programs[mid] ? `<button class="btn sm ghost" data-a="prog-reset" data-m="${mid}">Reset program</button>` : ""}</div>
+  ${UI.progForm === "add" ? `<div class="inline-form" style="margin-bottom:10px"><input type="date" id="pa-date" min="2026-11-30" max="2027-01-03" value="${TODAY}" aria-label="Date"><select id="pa-tpl" aria-label="Workout">${tplOpts}</select><button class="btn primary sm" data-a="prog-add" data-m="${mid}">Add</button><button class="btn ghost sm" data-a="prog-form-x">Cancel</button></div>` : ""}
+  ${UI.progForm === "pause" ? `<div class="inline-form" style="margin-bottom:10px"><label for="pp-from">From</label><input type="date" id="pp-from" value="${TODAY}"><label for="pp-to">to</label><input type="date" id="pp-to" value="${addDays(TODAY, 7)}"><button class="btn primary sm" data-a="prog-pause" data-m="${mid}">Pause</button><button class="btn ghost sm" data-a="prog-form-x">Cancel</button></div>` : ""}
+  ${Object.entries(weeks).map(([wk, ws]) => `<div class="wk"><div class="wk-h">Week of ${fmtD(wk)}</div>${ws.map(w => woHTML(mid, w)).join("")}</div>`).join("") || `<div class="muted">No program.</div>`}
+  ${changes.length ? `<div class="sec-h">Your changes</div><div class="small">${changes.map(c => `<div>• ${esc(c.text)}</div>`).join("")}</div>` : ""}`;
+}
+function woHTML(mid, w) {
+  const [st, col] = woStatus(mid, w), open = UI.openWo === w.id;
+  const opts = CATALOG.map(([n]) => n).sort().map(n => `<option>${esc(n)}</option>`).join("");
+  return `<div class="wo"><div class="wo-h" data-a="wo-toggle" data-id="${w.id}"><span class="d">${fmtD(w.date)}</span><b style="font-size:13px">${esc(w.name)}</b><span class="chip ${col}">${st}</span><span class="spacer"></span><span class="small muted">${open ? "▾" : "▸"}</span></div>
+   ${open ? `<div class="wo-b">${w.exercises.map((e, i) => `<div class="ex"><span>${esc(e.name)}</span><span class="rx">${esc(e.rx)}</span>${e.swappedFrom ? `<span class="chip sky">was ${esc(e.swappedFrom)}</span>` : ""}<span class="spacer"></span>
+     ${UI.swap === w.id + ":" + i ? `<select id="sw-to" aria-label="Swap to">${opts}</select><select id="sw-scope" aria-label="Apply to"><option value="one">This workout only</option><option value="all">All upcoming workouts</option></select><button class="btn primary sm" data-a="swap-do" data-m="${mid}" data-w="${w.id}" data-i="${i}">Swap</button><button class="btn ghost sm" data-a="swap-x">✕</button>`
+      : `<button class="btn sm" data-a="swap-open" data-w="${w.id}" data-i="${i}">Swap</button><button class="btn sm ghost" data-a="ex-remove" data-m="${mid}" data-w="${w.id}" data-i="${i}">Remove</button>`}</div>`).join("")}
+     <div class="inline-form"><label for="mv-${w.id}">Move to</label><input type="date" id="mv-${w.id}" value="${w.date}"><button class="btn sm" data-a="wo-move" data-m="${mid}" data-w="${w.id}">Move</button><span class="spacer"></span>${w.paused ? `<button class="btn sm" data-a="wo-unpause" data-m="${mid}" data-w="${w.id}">Unpause</button>` : ""}<button class="btn sm danger" data-a="wo-delete" data-m="${mid}" data-w="${w.id}">Delete workout</button></div></div>` : ""}</div>`;
+}
+function progChange(mid, text, d) { (S.progLog ||= []).push({ m: mid, text, todo: UI.lastTodo, t: tNow() }); log("prog_" + d.op, { member: mid, ...d }); save(); }
+
+/* ---------- calendar ---------- */
+function calendarView() {
+  const days = [...Array(7)].map((_, i) => addDays(UI.calWeek, i));
+  const times = []; for (let m = 420; m < 1140; m += 30) times.push(`${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`);
+  const cell = (d, t) => {
+    const h = hoursFor(UI.calId, d);
+    if (!h || tmin(t) < h[0] || tmin(t) >= h[1]) return `<td class="closed" title="${closedLabel(UI.calId, d)}"></td>`;
+    const a = apptAt(UI.calId, d, t);
+    if (a) { const who = a.member ? MEMBERS[a.member].name : a.other; const cls = a.by === "you" ? "yours" : a.member ? "ours" : ""; return `<td><button class="slot bk ${cls}" data-a="appt" data-id="${a.id}" title="${esc(who)}">${esc(who)}${a.member ? ` · ${TYPE_LABEL[a.type].replace("Progress ", "")}` : ""}</button></td>`; }
+    if (isPast(d, t)) return `<td><span class="slot" style="border:0;opacity:.35">past</span></td>`;
+    return `<td><button class="slot" data-a="slot" data-d="${d}" data-t="${t}" aria-label="Open ${fmtD(d)} ${fmtT(t)}">open</button></td>`;
+  };
+  return `<div class="card" style="padding:16px"><div class="card-h" style="padding:0 0 10px">Calendar <span class="small muted" style="font-weight:400">Scheduling for all offices and coaches. Click an open slot to book, or an appointment to change it.</span></div>
+  <div class="cal-ctl"><select id="cal-id" data-a-change="cal-id" aria-label="Calendar">${Object.entries(CALS).map(([k, c]) => `<option value="${k}" ${k === UI.calId ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>
+   <button class="btn sm" data-a="cal-week" data-n="-7" ${UI.calWeek <= "2026-11-28" ? "disabled" : ""}>‹ Prev</button><b class="small">${fmtD(days[0])} – ${fmtD(days[6])}</b><button class="btn sm" data-a="cal-week" data-n="7" ${UI.calWeek >= "2026-12-27" ? "disabled" : ""}>Next ›</button>
+   <span class="small muted">${CALS[UI.calId].office !== "Virtual" ? esc(OFFICES[CALS[UI.calId].office].hours) : "Virtual calls"}</span></div>
+  <div class="cal-wrap"><table class="cal"><thead><tr><th></th>${days.map(d => `<th${d === TODAY ? ' style="color:var(--amber-fg)"' : ""}>${fmtD(d)}${d === TODAY ? " · today" : ""}</th>`).join("")}</tr></thead>
+  <tbody>${times.map(t => `<tr><td class="t">${fmtT(t)}</td>${days.map(d => cell(d, t)).join("")}</tr>`).join("")}</tbody></table></div></div>`;
+}
+function memberOptions(sel) { return Object.entries(MEMBERS).sort((a, b) => a[1].name.localeCompare(b[1].name)).map(([k, m]) => `<option value="${k}" ${k === sel ? "selected" : ""}>${esc(m.name)}${m.lead ? " (lead)" : ""}</option>`).join(""); }
+function sideView() {
+  const s = UI.side;
+  if (s.kind === "slot") {
+    const types = CALS[UI.calId].types;
+    return `<div class="card side" role="dialog" aria-label="Book appointment"><b>Book · ${esc(CALS[UI.calId].name)}</b><div class="small">${fmtD(s.d)}, ${fmtT(s.t)}</div>
+     <label for="bk-m">Client</label><select id="bk-m">${memberOptions(UI.lastTodo ? TD[UI.lastTodo].m : "")}</select>
+     <label for="bk-type">Type</label><select id="bk-type">${types.map(t => `<option value="${t}">${TYPE_LABEL[t]}</option>`).join("")}</select>
+     <div class="comp-actions"><button class="btn primary sm" data-a="book">Book</button><button class="btn ghost sm" data-a="side-x">Cancel</button></div></div>`;
+  }
+  const a = S.appts.find(x => x.id === s.id); if (!a) return "";
+  if (!a.member) return `<div class="card side"><b>Booked</b><div class="small muted">Another member's appointment. Details are hidden.</div><button class="btn sm" data-a="side-x">Close</button></div>`;
+  const within24 = (() => { const appt = new Date(a.date + "T" + a.time + ":00"), now = new Date(TODAY + "T09:00:00"); return (appt - now) < 24 * 3600 * 1000; })();
+  let body = "";
+  if (s.mode === "resched") {
+    const days = [...Array(21)].map((_, i) => addDays(TODAY, i)).filter(d => slotsFor(s.cal || a.cal, d).some(t => !apptAt(s.cal || a.cal, d, t) && !isPast(d, t)));
+    const cal = s.cal || a.cal, d = s.d && days.includes(s.d) ? s.d : days[0];
+    const times = d ? slotsFor(cal, d).filter(t => !apptAt(cal, d, t) && !isPast(d, t)) : [];
+    const sameType = Object.entries(CALS).filter(([, c]) => c.types.includes(a.type));
+    body = `<label for="rs-cal">Calendar</label><select id="rs-cal" data-a-change="rs-cal">${sameType.map(([k, c]) => `<option value="${k}" ${k === cal ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>
+      <label for="rs-d">Date</label><select id="rs-d" data-a-change="rs-d" data-reset="1">${days.map(x => `<option value="${x}" ${x === d ? "selected" : ""}>${fmtD(x)}</option>`).join("")}</select>
+      <label for="rs-t">Time</label><select id="rs-t" data-reset="1">${times.map(x => `<option value="${x}">${fmtT(x)}</option>`).join("")}</select>
+      <div class="comp-actions"><button class="btn primary sm" data-a="resched-do" ${times.length ? "" : "disabled"}>Move appointment</button><button class="btn ghost sm" data-a="side-mode" data-v="">Back</button></div>`;
+  } else if (s.mode === "cancel") {
+    body = `<div class="small">${within24 ? "This is less than 24 hours away: the $50 late fee applies unless you waive it." : "More than 24 hours away: no late fee."}</div>
+      ${within24 ? `<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="cx-waive"> Waive late fee</label>` : ""}
+      <label for="cx-reason">Reason</label><input type="text" id="cx-reason" placeholder="e.g. Member is sick">
+      <div class="comp-actions"><button class="btn danger sm" data-a="cancel-do">Cancel appointment</button><button class="btn ghost sm" data-a="side-mode" data-v="">Back</button></div>`;
+  } else if (s.mode === "desk") {
+    body = `<label for="desk-text">Message to the ${esc(a.office === "Virtual" ? "coach" : OFFICES[a.office].name + " front desk")}</label><textarea id="desk-text" rows="3"></textarea>
+      <div class="comp-actions"><button class="btn primary sm" data-a="desk-do">Send</button><button class="btn ghost sm" data-a="side-mode" data-v="">Back</button></div>`;
+  } else {
+    body = `<div class="comp-actions"><button class="btn sm" data-a="side-mode" data-v="resched">Reschedule</button><button class="btn sm danger" data-a="side-mode" data-v="cancel">Cancel</button><button class="btn sm" data-a="side-mode" data-v="desk">Message front desk</button></div>`;
+  }
+  return `<div class="card side" role="dialog" aria-label="Appointment"><div class="comp-actions"><b>${esc(MEMBERS[a.member].name)}</b><span class="spacer"></span><button class="btn ghost sm" data-a="side-x" aria-label="Close">✕</button></div>
+   <div class="small">${apptLine(a)}</div>${a.by === "you" ? `<span class="chip green">Booked by you</span>` : ""}${body}</div>`;
+}
+
+/* ---------- billing ---------- */
+function chargesOf(mid) { return BILLING[mid] || (MEMBERS[mid].lead ? [] : [{ id: "ch_" + mid, date: "2026-10-15", desc: "12-week package", amount: 1788 }]); }
+function billingView() {
+  const q = (UI.billQ || "").toLowerCase();
+  const list = Object.entries(MEMBERS).filter(([, m]) => m.name.toLowerCase().includes(q)).sort((a, b) => a[1].name.localeCompare(b[1].name));
+  const mid = UI.billCust, m = MEMBERS[mid], ch = chargesOf(mid);
+  const refunded = id => S.refunds.filter(r => r.charge === id).reduce((s, r) => s + r.amount, 0);
+  return `<div class="card" style="padding:16px"><div class="card-h" style="padding:0 0 10px">Billing <span class="small muted" style="font-weight:400">Payments, refunds and receipts</span></div>
+  <div class="bill"><div><input type="text" id="bill-q" placeholder="Search customers" data-a-input="bill-q" style="width:100%;margin-bottom:8px" aria-label="Search customers"><div class="cust">${list.map(([k, x]) => `<button class="${k === mid ? "on" : ""}" data-a="bill-cust" data-v="${k}">${esc(x.name)}</button>`).join("")}</div></div>
+  <div style="min-width:0"><div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">${avatar(m.name, mid)}<div><b>${esc(m.name)}</b><div class="small muted">${esc(emailOf(mid))}</div></div></div>
+  ${ch.length ? `<div class="scroll-x"><table class="t"><thead><tr><th>Date</th><th>Description</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead><tbody>
+  ${ch.map(c => { const r = refunded(c.id); const sent = S.receipts.filter(x => x.charge === c.id).length; return `<tr><td>${fmtD(c.date)}</td><td>${esc(c.desc)}<div class="small muted">${c.id}</div></td><td class="num">$${c.amount.toLocaleString()}</td><td>${r ? `<span class="chip sky">Refunded $${r}</span>` : `<span class="chip green">Paid</span>`}${sent ? ` <span class="chip">Receipt sent</span>` : ""}</td>
+   <td><div class="comp-actions">${UI.billAct === "refund:" + c.id ? `<input type="text" id="rf-amt" value="${c.amount - r}" style="width:80px" aria-label="Refund amount"><select id="rf-reason" aria-label="Reason"><option>Duplicate charge</option><option>Customer request</option><option>Other</option></select><button class="btn danger sm" data-a="refund-do" data-c="${c.id}">Refund</button><button class="btn ghost sm" data-a="bill-act" data-v="">✕</button>`
+     : UI.billAct === "receipt:" + c.id ? `<span class="small">Send receipt to ${esc(emailOf(mid))}?</span><button class="btn primary sm" data-a="receipt-do" data-c="${c.id}">Send</button><button class="btn ghost sm" data-a="bill-act" data-v="">✕</button>`
+     : `<button class="btn sm" data-a="bill-act" data-v="receipt:${c.id}">Send receipt</button>${r < c.amount ? `<button class="btn sm" data-a="bill-act" data-v="refund:${c.id}">Refund</button>` : ""}`}</div></td></tr>`; }).join("")}
+  </tbody></table></div>` : `<div class="muted">No payments yet.</div>`}</div></div></div>`;
+}
+
+/* ---------- results (owner) ---------- */
+async function loadResults() {
+  UI.resultsData = { loading: true }; render();
+  try {
+    const main = await db.doc("attempt/main").get();
+    const evs = await db.collection("attempt/main/events").get();
+    const events = evs.docs.map(d => d.data()).sort((a, b) => a.chunk - b.chunk).flatMap(c => c.events || []);
+    UI.resultsData = { state: main.exists ? main.data().state : null, events };
+  } catch (e) { UI.resultsData = { error: String(e.message || e.code || e) }; }
+  render();
+}
+function words(s) { return new Set(String(s || "").toLowerCase().match(/[a-z0-9$:]+/g) || []); }
+function sim(a, b) { const A = words(a), B = words(b); if (!A.size || !B.size) return 0; let i = 0; for (const w of A) if (B.has(w)) i++; return i / (A.size + B.size - i); }
+function resultsView() {
+  const R = UI.resultsData; if (!R || R.loading) return `<div class="card" style="padding:16px">Loading results…</div>`;
+  if (R.error) return `<div class="card" style="padding:16px">Couldn't load results: ${esc(R.error)}</div>`;
+  const st = R.state; if (!st) return `<div class="card" style="padding:16px">No attempt saved yet.</div>`;
+  const E = R.events, used = (st.endedAt || Date.now()) - (st.testStart || Date.now());
+  const toolOf = ty => ty.startsWith("prog_") ? "Program" : ty.startsWith("cal_") ? "Calendar" : ty.startsWith("bill_") ? "Billing" : ty === "handoff" ? "Hand-off" : null;
+  const toolsByTodo = {}; for (const e of E) { const k = toolOf(e.ty); if (k && e.td) (toolsByTodo[e.td] ||= new Set()).add(k); }
+  const rows = TODOS.map(t => { const s = st.td[t.id] || {}; return { t, s }; });
+  const tools = {}; for (const r of rows) for (const k of (toolsByTodo[r.t.id] || [])) (tools[k] ||= []).push({ id: r.t.id, first: r.s.firstOpenT ?? 1e12, ms: r.s.activeMs || 0 });
+  const curve = Object.entries(tools).map(([k, l]) => { l.sort((a, b) => a.first - b.first); const later = l.slice(1).map(x => x.ms).sort((a, b) => a - b); const med = later.length ? later[Math.floor(later.length / 2)] : null; return [k, l.length, l[0].ms, med]; });
+  const edited = rows.reduce((n, r) => n + (r.s.replies || []).filter(x => x.edits && x.edits.length).length, 0), whys = rows.filter(r => (r.s.why || "").trim()).length;
+  const ext = rows.reduce((s, r) => s + (r.s.extPastes || 0), 0);
+  return `<div style="display:grid;gap:14px">
+  <div class="card" style="padding:16px"><div class="card-h" style="padding:0 0 8px">${esc(st.name || "Candidate")} <span class="chip">${esc(st.phase)}</span>${st.endReason ? `<span class="chip">${st.endReason === "time" ? "Ran out of time" : "Finished"}</span>` : ""}<span class="spacer"></span><button class="btn sm" data-a="copy-json">Copy all data as JSON</button></div>
+  <div class="res-grid">
+   ${[["To-dos done", `${rows.filter(r => r.s.status === "done").length}/30`], ["Shift time", clock(used)], ["Playbook reading", mins(st.pbMs || 0) + " min"], ["Playbook during shift", mins(st.pbInTestMs || 0) + " min"], ["Away from tab", mins(st.awayMs || 0) + " min"], ["Outside pastes", ext], ["Edited replies", edited], ["Reasoning notes", whys]].map(([k, v]) => `<div class="card stat"><div class="v">${v}</div><div class="k">${k}</div></div>`).join("")}
+  </div></div>
+  <div class="card" style="padding:16px"><div class="card-h" style="padding:0 0 8px">Learning curve by tool</div><div class="scroll-x"><table class="t"><thead><tr><th>Tool</th><th class="num">To-dos used on</th><th class="num">1st use (min)</th><th class="num">Median later use (min)</th><th class="num">Change</th></tr></thead><tbody>
+   ${curve.map(([k, n, f, med]) => `<tr><td>${k}</td><td class="num">${n}</td><td class="num">${mins(f)}</td><td class="num">${med == null ? "–" : mins(med)}</td><td class="num">${med == null || !f ? "–" : Math.round((med - f) / f * 100) + "%"}</td></tr>`).join("") || `<tr><td colspan="5" class="muted">No tool use yet.</td></tr>`}</tbody></table></div></div>
+  <div class="card" style="padding:16px"><div class="card-h" style="padding:0 0 8px">Every to-do</div><div class="scroll-x"><table class="t" style="min-width:980px"><thead><tr><th>#</th><th>Member · topic</th><th class="num">Active min</th><th class="num">Opens</th><th>Outcome</th><th>Tools</th><th>What they sent</th><th>Their reasoning</th></tr></thead><tbody>
+   ${rows.map(({ t, s }) => `<tr><td>${t.id}</td><td><b>${esc(MEMBERS[t.m].name)}</b><div class="small muted">${esc(t.topic)}</div></td><td class="num">${mins(s.activeMs || 0)}</td><td class="num">${s.opens || 0}</td>
+    <td>${s.status === "done" ? (s.how === "noreply" ? "Closed, no reply" : "Replied") : `<span class="chip amber">Not done</span>`}${s.handoffs ? ` <span class="chip sky">Hand-off ×${s.handoffs}</span>` : ""}${s.extPastes ? ` <span class="chip red">Outside paste ×${s.extPastes}</span>` : ""}</td>
+    <td class="small">${[...(toolsByTodo[t.id] || [])].join(", ")}</td><td class="small" style="max-width:360px">${(s.replies || []).map(r => esc(r.text) + ((r.edits || []).length ? `<div class="muted" style="margin-top:4px">Edited ${r.edits.length}×. First sent: “${esc(r.edits[0].text)}”</div>` : "")).join("<hr style='border:0;border-top:1px solid var(--border)'>") || "<span class='muted'>–</span>"}${(st.notes || []).filter(n => n.todo === t.id).map(n => `<div class="muted" style="margin-top:4px">→ ${esc(n.toName)}${n.urgent ? " (urgent)" : ""}: ${esc(n.text)}</div>`).join("")}</td>
+    <td class="small" style="max-width:240px">${s.why ? esc(s.why) : "<span class='muted'>–</span>"}</td></tr>`).join("")}</tbody></table></div></div>
+  <div class="card" style="padding:16px"><div class="card-h" style="padding:0 0 8px">Tool actions</div><div class="small">
+   ${(st.progLog || []).map(c => `<div>Program · ${esc(MEMBERS[c.m].name)}: ${esc(c.text)}</div>`).join("")}
+   ${st.appts.filter(a => a.by === "you" || a.changed || a.cancelled).map(a => `<div>Calendar · ${a.member ? esc(MEMBERS[a.member].name) : ""}: ${a.cancelled ? `cancelled ${esc(a.date)} ${esc(a.time)}${a.feeWaived ? " (fee waived)" : a.feeCharged ? " (late fee charged)" : ""}` : `${a.by === "you" ? "booked" : "moved to"} ${esc(a.cal)} ${esc(a.date)} ${esc(a.time)}`}</div>`).join("")}
+   ${st.refunds.map(r => `<div>Billing · refund $${r.amount} on ${esc(r.charge)} (${esc(r.reason)})</div>`).join("")}${st.receipts.map(r => `<div>Billing · receipt sent for ${esc(r.charge)}</div>`).join("")}
+   ${(st.desk || []).map(d => `<div>Front desk · ${esc(d.text)}</div>`).join("")}</div></div>
+  <div class="card" style="padding:16px"><details><summary><b>Raw event log (${E.length})</b></summary><pre class="log">${esc(E.map(e => `${clock(e.t)}  ${e.td || "-"}  ${e.ty}  ${JSON.stringify(Object.fromEntries(Object.entries(e).filter(([k]) => !["t", "w", "ty", "td", "ph"].includes(k))))}`).join("\n"))}</pre></details></div></div>`;
+}
+
+/* ---------- confirm ---------- */
+function confirmView() {
+  const c = UI.confirm;
+  return `<div class="overlay"><div class="card" style="padding:18px;max-width:420px;display:grid;gap:12px;box-shadow:var(--shadow)" role="alertdialog" aria-label="${esc(c.title)}"><b>${esc(c.title)}</b><div class="small">${esc(c.body)}</div>
+  <div class="comp-actions"><button class="btn ${c.danger ? "danger" : "primary"}" data-a="confirm-yes">${esc(c.yes)}</button><button class="btn ghost" data-a="confirm-no">Cancel</button></div></div></div>`;
+}
+
+/* ---------- actions ---------- */
+function openTodo(id) {
+  UI.open = id; UI.lastTodo = id; UI.rtab = "overview"; UI.handoff = null; UI.slash = false; UI.openWo = null; UI.swap = null; UI.progForm = null; UI.scrollThread = true; UI.side = null;
+  const s = tdState(id); s.opens++; if (s.firstOpenT == null) s.firstOpenT = tNow();
+  log("open_todo", {}, id); render(); save();
+}
+function finish(reason) { if (S.phase !== "test") return; S.phase = "done"; S.endedAt = Date.now(); S.endReason = reason; UI.open = null; UI.editing = null; log("finish", { reason, done: doneCount() }); flushEvents(true); save(true); render(); if (WEB) sendFinal(); }
+async function sendFinal() { UI.webFinal = "sending"; render(); const ok = await webSend("finish"); UI.webFinal = ok ? "sent" : "failed"; if (ok) { S.sentFinal = Date.now(); webSaveLocal(); } render(); }
+function replyBox() { return UI.open ? document.getElementById("reply-" + UI.open) : null; }
+function insertText(text) { const ta = replyBox(); if (!ta) return; ta.value = ta.value && !ta.value.startsWith("/") ? ta.value.trimEnd() + "\n\n" + text : text; UI.slash = false; renderLayer(); const n = replyBox(); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }
+
+document.addEventListener("click", async e => {
+  const el = e.target.closest("[data-a]"); if (!el) return;
+  const a = el.dataset.a;
+  if (a === "overlay-bg") { if (e.target === el) { closeConvo(); } return; }
+  e.preventDefault();
+  const id = UI.open;
+  switch (a) {
+    case "to-playbook": {
+      const n = ($("#cand-name")?.value || "").trim(); if (n.length < 3) { toast("Enter your full name first"); $("#cand-name")?.focus(); return; }
+      let em = "";
+      if (WEB) { em = ($("#cand-email")?.value || "").trim(); if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { toast("Enter your email first"); $("#cand-email")?.focus(); return; } S.email = em; }
+      S.name = n; S.phase = "playbook"; S.pbStart = Date.now(); log("playbook_open", { name: n }, null); save(true); webSend("playbook"); render(); window.scrollTo(0, 0); return;
+    }
+    case "start-test": S.phase = "test"; S.testStart = Date.now(); UI.view = "home"; log("test_start", { pbMs: S.pbMs }, null); save(true); webSend("start"); render(); window.scrollTo(0, 0); return;
+    case "finish": { const left = 30 - doneCount(); UI.confirm = { title: "Finish the shift?", body: left ? `${left} to-dos are still open. You can't come back after finishing.` : "You can't come back after finishing.", yes: "Finish shift", act: () => finish("submitted") }; renderLayer(); return; }
+    case "confirm-yes": { const f = UI.confirm.act; UI.confirm = null; f(); renderLayer(); return; }
+    case "confirm-no": UI.confirm = null; renderLayer(); return;
+    case "nav": UI.view = el.dataset.v; UI.side = null; log("nav", { view: UI.view }); render(); return;
+    case "toggle-done": UI.showDone = !UI.showDone; render(); return;
+    case "open": openTodo(el.dataset.id); return;
+    case "close": closeConvo(); return;
+    case "rtab": UI.rtab = el.dataset.v; log("member_tab", { tab: UI.rtab }); renderLayer(); return;
+    case "handoff": UI.handoff = el.dataset.k; renderLayer(); $("#ho-text")?.focus(); return;
+    case "handoff-cancel": UI.handoff = null; renderLayer(); return;
+    case "handoff-send": {
+      const text = $("#ho-text").value.trim(); if (!text) { toast("Write the note first"); return; }
+      const to = $("#ho-to").value, urgent = $("#ho-urgent").checked;
+      S.notes.push({ todo: id, kind: UI.handoff, to, toName: STAFF[to].name, urgent, text, t: tNow() }); tdState(id).handoffs++;
+      log("handoff", { kind: UI.handoff, to, urgent, text }); UI.handoff = null; UI.scrollThread = true; save(); render(); toast(`Sent to ${STAFF[to].name}`); return;
+    }
+    case "send": {
+      const ta = replyBox(); const text = (ta?.value || "").trim(); if (!text || text === "/") { toast("Write a reply first"); return; }
+      const t = TD[id], p = PLACE[id] || {}, s = tdState(id);
+      const via = p.support ? ((t.ch === "email" || t.ch === "form") ? "Email" : "Text") : p.flag ? "1:1 chat" : "Group chat";
+      s.replies.push({ text, t: tNow(), via, asCoach: p.flag ? STAFF[MEMBERS[t.m].coach].name : null });
+      const wasDone = s.status === "done"; s.status = "done"; s.how = "reply"; if (!wasDone) s.doneT = tNow();
+      log("send_reply", { text, via, len: text.length }); ta.value = ""; ta.dataset.reset = "1"; UI.scrollThread = true; save(); render(); toast("Sent"); return;
+    }
+    case "noreply": { const s = tdState(id); s.status = "done"; s.how = "noreply"; s.doneT = tNow(); log("close_no_reply"); save(); closeConvo(); toast("Closed without reply"); return; }
+    case "use-saved": { const k = el.dataset.k; log("saved_reply", { key: k, suggested: SUGGEST[id] === k }); insertText(SAVED_REPLIES[k]); return; }
+    case "dismiss-sugg": tdState(id).suggDismissed = true; log("suggestion_dismiss"); renderLayer(); return;
+    case "goto-cal": { const m = MEMBERS[el.dataset.m]; UI.calId = "dexa-" + m.office; UI.calWeek = TODAY; UI.view = "calendar"; log("goto_calendar", { member: el.dataset.m }); closeConvo(true); return; }
+    case "goto-bill": UI.billCust = el.dataset.m; UI.view = "billing"; log("goto_billing", { member: el.dataset.m }); closeConvo(true); return;
+    /* program */
+    case "wo-toggle": UI.openWo = UI.openWo === el.dataset.id ? null : el.dataset.id; UI.swap = null; renderLayer(); return;
+    case "swap-open": UI.swap = el.dataset.w + ":" + el.dataset.i; renderLayer(); return;
+    case "swap-x": UI.swap = null; renderLayer(); return;
+    case "swap-do": {
+      const mid = el.dataset.m, P = editProgram(mid), w = P.find(x => x.id === el.dataset.w), i = +el.dataset.i, to = $("#sw-to").value, scope = $("#sw-scope").value, from = w.exercises[i].name;
+      if (to === from) { UI.swap = null; renderLayer(); return; }
+      const targets = scope === "all" ? P.filter(x => x.date >= TODAY && x.exercises.some(e => e.name === from)) : [w]; let n = 0;
+      for (const x of targets) for (const ex of x.exercises) if (ex.name === from && (scope === "all" || x.exercises.indexOf(ex) === i)) { ex.swappedFrom = ex.swappedFrom || from; ex.name = to; n++; }
+      UI.swap = null; progChange(mid, `Swapped ${from} → ${to} (${scope === "all" ? `all upcoming, ${n} workouts` : `${w.name}, ${fmtD(w.date)}`})`, { op: "swap", from, to, scope, wid: w.id, date: w.date, n }); renderLayer(); toast("Swapped"); return;
+    }
+    case "ex-remove": { const mid = el.dataset.m, P = editProgram(mid), w = P.find(x => x.id === el.dataset.w), [ex] = w.exercises.splice(+el.dataset.i, 1); progChange(mid, `Removed ${ex.name} from ${w.name}, ${fmtD(w.date)}`, { op: "remove_ex", ex: ex.name, date: w.date }); renderLayer(); return; }
+    case "wo-move": { const mid = el.dataset.m, P = editProgram(mid), w = P.find(x => x.id === el.dataset.w), d = $("#mv-" + w.id).value; if (!d || d === w.date) return; const from = w.date; w.date = d; progChange(mid, `Moved ${w.name} from ${fmtD(from)} to ${fmtD(d)}`, { op: "move", from, to: d, name: w.name }); renderLayer(); toast("Moved"); return; }
+    case "wo-delete": { const mid = el.dataset.m, P = editProgram(mid), k = P.findIndex(x => x.id === el.dataset.w), [w] = P.splice(k, 1); UI.openWo = null; progChange(mid, `Deleted ${w.name} on ${fmtD(w.date)}`, { op: "delete", date: w.date, name: w.name }); renderLayer(); return; }
+    case "wo-unpause": { const mid = el.dataset.m, w = editProgram(mid).find(x => x.id === el.dataset.w); w.paused = false; progChange(mid, `Unpaused ${w.name}, ${fmtD(w.date)}`, { op: "unpause", date: w.date }); renderLayer(); return; }
+    case "prog-add-open": UI.progForm = "add"; renderLayer(); return;
+    case "prog-pause-open": UI.progForm = "pause"; renderLayer(); return;
+    case "prog-form-x": UI.progForm = null; renderLayer(); return;
+    case "prog-add": { const mid = el.dataset.m, d = $("#pa-date").value, tpl = $("#pa-tpl").value; if (!d) return; editProgram(mid).push({ id: "n" + Date.now(), date: d, name: tpl, exercises: TEMPLATES[tpl].map(([n, rx]) => ({ name: n, rx })) }); UI.progForm = null; progChange(mid, `Added ${tpl} on ${fmtD(d)}`, { op: "add", date: d, tpl }); renderLayer(); toast("Workout added"); return; }
+    case "prog-pause": { const mid = el.dataset.m, f = $("#pp-from").value, t2 = $("#pp-to").value; if (!f || !t2 || t2 < f) { toast("Pick a valid date range"); return; } let n = 0; for (const w of editProgram(mid)) if (w.date >= f && w.date <= t2) { w.paused = true; n++; } UI.progForm = null; progChange(mid, `Paused workouts ${fmtD(f)} – ${fmtD(t2)} (${n} workouts)`, { op: "pause", from: f, to: t2, n }); renderLayer(); toast("Workouts paused"); return; }
+    case "prog-reset": { const mid = el.dataset.m; delete S.programs[mid]; progChange(mid, "Reset program to original", { op: "reset" }); renderLayer(); return; }
+    /* calendar */
+    case "cal-week": UI.calWeek = addDays(UI.calWeek, +el.dataset.n); UI.side = null; log("cal_week", { week: UI.calWeek }); render(); return;
+    case "slot": UI.side = { kind: "slot", d: el.dataset.d, t: el.dataset.t }; log("cal_slot_click", { cal: UI.calId, d: el.dataset.d, t: el.dataset.t }); renderLayer(); return;
+    case "appt": UI.side = { kind: "appt", id: el.dataset.id, mode: "" }; log("cal_appt_open", { appt: el.dataset.id }); renderLayer(); return;
+    case "side-x": UI.side = null; renderLayer(); return;
+    case "side-mode": UI.side.mode = el.dataset.v; UI.side.cal = null; UI.side.d = null; renderLayer(); return;
+    case "book": { const mid = $("#bk-m").value, type = $("#bk-type").value, s = UI.side; const cal = CALS[UI.calId]; S.appts.push({ id: "y" + Date.now(), member: mid, type, cal: UI.calId, office: cal.office, staff: UI.calId.startsWith("calls-") ? UI.calId.slice(6) : UI.calId === "form-sam" ? "sam" : "DEXA", date: s.d, time: s.t, by: "you" }); log("cal_book", { member: mid, type, cal: UI.calId, date: s.d, time: s.t }); UI.side = null; save(); render(); toast(`Booked ${MEMBERS[mid].name}`); return; }
+    case "resched-do": { const ap = S.appts.find(x => x.id === UI.side.id), cal = $("#rs-cal").value, d = $("#rs-d").value, t = $("#rs-t").value; const old = `${ap.cal} ${ap.date} ${ap.time}`; Object.assign(ap, { cal, office: CALS[cal].office, date: d, time: t, changed: true }); log("cal_reschedule", { appt: ap.id, member: ap.member, from: old, to: `${cal} ${d} ${t}` }); UI.side = null; save(); render(); toast("Appointment moved"); return; }
+    case "cancel-do": { const ap = S.appts.find(x => x.id === UI.side.id), waive = !!$("#cx-waive")?.checked, reason = $("#cx-reason").value, within = !!$("#cx-waive") || false; ap.cancelled = true; ap.feeWaived = within && waive; ap.feeCharged = within && !waive; log("cal_cancel", { appt: ap.id, member: ap.member, within24: within, feeWaived: ap.feeWaived, reason }); UI.side = null; save(); render(); toast("Appointment cancelled"); return; }
+    case "desk-do": { const ap = S.appts.find(x => x.id === UI.side.id), text = $("#desk-text").value.trim(); if (!text) return; S.desk.push({ appt: ap.id, member: ap.member, text, todo: UI.lastTodo, t: tNow() }); S.notes.push({ todo: UI.lastTodo, kind: "desk", to: ap.office, toName: ap.office === "Virtual" ? "coach" : OFFICES[ap.office].name + " front desk", text, t: tNow() }); log("cal_desk_message", { appt: ap.id, text }); UI.side = null; save(); renderLayer(); toast("Sent to front desk"); return; }
+    /* billing */
+    case "bill-cust": UI.billCust = el.dataset.v; UI.billAct = null; log("bill_view", { member: UI.billCust }); render(); return;
+    case "bill-act": UI.billAct = el.dataset.v || null; render(); return;
+    case "refund-do": { const c = el.dataset.c, amt = Math.round(parseFloat(($("#rf-amt").value || "").replace(/[^0-9.]/g, "")) * 100) / 100, reason = $("#rf-reason").value; const ch = chargesOf(UI.billCust).find(x => x.id === c); if (!(amt > 0) || amt > ch.amount) { toast("Enter an amount up to the charge"); return; } S.refunds.push({ member: UI.billCust, charge: c, amount: amt, reason, todo: UI.lastTodo, t: tNow() }); log("bill_refund", { member: UI.billCust, charge: c, amount: amt, reason, desc: ch.desc, date: ch.date }); UI.billAct = null; save(); render(); toast(`Refunded $${amt}`); return; }
+    case "receipt-do": { const c = el.dataset.c; S.receipts.push({ member: UI.billCust, charge: c, todo: UI.lastTodo, t: tNow() }); log("bill_receipt", { member: UI.billCust, charge: c }); UI.billAct = null; save(); render(); toast("Receipt sent"); return; }
+    /* edit a sent message */
+    case "edit-open": UI.editing = id + ":" + el.dataset.i; log("edit_open", { i: +el.dataset.i }); renderLayer(); $(`#edit-${id}-${el.dataset.i}`)?.focus(); return;
+    case "edit-x": UI.editing = null; renderLayer(); return;
+    case "edit-save": {
+      const i = +el.dataset.i, r = tdState(id).replies[i], v = ($(`#edit-${id}-${i}`)?.value || "").trim(); UI.editing = null;
+      if (!r || !v || v === r.text) { renderLayer(); return; }
+      (r.edits ||= []).push({ text: r.text, t: r.editedT ?? r.t }); r.text = v; r.editedT = tNow();
+      log("edit_reply", { i, from: r.edits[r.edits.length - 1].text, to: v }); save(); renderLayer(); toast("Message updated"); return;
+    }
+    /* owner */
+    case "web-resend": sendFinal(); return;
+    case "review-load": {
+      const txt = [1, 2, 3, 4].map(i => $("#rv-" + i)?.value || "").join("").replace(/\s+/g, "");
+      if (!txt) { UI.reviewErr = "Paste the Snapshot field first."; render(); return; }
+      unB64(txt).then(j => { const d = JSON.parse(j); UI.reviewErr = null; UI.resultsData = { state: d.state, events: d.events || [] }; UI.ownerResults = true; UI.view = "results"; render(); })
+        .catch(() => { UI.reviewErr = "That doesn't decode. Paste every Snapshot field of one submission, in order, with nothing else."; render(); });
+      return;
+    }
+    case "owner-results": UI.ownerResults = true; UI.view = "results"; render(); loadResults(); return;
+    case "owner-reset": UI.confirm = { title: "Reset this attempt?", body: "This deletes the saved answers, timings and event log in this copy so a candidate starts fresh. It can't be undone.", yes: "Delete attempt", danger: true, act: resetAttempt }; renderLayer(); return;
+    case "copy-json": { const txt = JSON.stringify(UI.resultsData, null, 1); try { await navigator.clipboard.writeText(txt); toast("Copied"); } catch (_) { toast("Copy blocked by the browser"); } return; }
+  }
+});
+document.addEventListener("change", e => {
+  const el = e.target.closest("[data-a-change]"); if (!el) return;
+  const a = el.dataset.aChange;
+  if (a === "cal-id") { UI.calId = el.value; UI.side = null; log("cal_switch", { cal: UI.calId }); render(); }
+  if (a === "rs-cal") { UI.side.cal = el.value; UI.side.d = null; renderLayer(); }
+  if (a === "rs-d") { UI.side.cal = $("#rs-cal").value; UI.side.d = el.value; renderLayer(); }
+});
+let typingLog = {}, whyT;
+document.addEventListener("input", e => {
+  const el = e.target;
+  if (el.dataset.aInput === "reply") {
+    const v = el.value; const wantSlash = v.startsWith("/") && !v.includes("\n");
+    if (wantSlash !== !!UI.slash || (wantSlash && UI.slashQ !== v.slice(1))) { UI.slash = wantSlash; UI.slashQ = v.slice(1); renderLayer(); }
+    const k = UI.open; const now = Date.now(); if (!typingLog[k] || now - typingLog[k] > 20000) { typingLog[k] = now; log("typing", { len: v.length }); }
+  }
+  if (el.dataset.aInput === "why" && UI.open) { const st = tdState(UI.open), first = !st.why; st.why = el.value; if (first) log("why_start"); clearTimeout(whyT); whyT = setTimeout(() => { log("why", { text: st.why }); save(); }, 1200); }
+  if (el.dataset.aInput === "bill-q") { UI.billQ = el.value; const pos = el.selectionStart; render(); const n = $("#bill-q"); n.focus(); n.setSelectionRange(pos, pos); }
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") { if (UI.confirm) { UI.confirm = null; renderLayer(); } else if (UI.editing) { UI.editing = null; renderLayer(); } else if (UI.slash) { UI.slash = false; renderLayer(); } else if (UI.side) { UI.side = null; renderLayer(); } else if (UI.open) closeConvo(); }
+});
+function closeConvo(silent) { if (!UI.open) return; UI.editing = null; log("close_todo", { activeMs: tdState(UI.open).activeMs }, UI.open); UI.open = null; UI.handoff = null; UI.slash = false; save(); render(); }
+async function resetAttempt() {
+  try { const evs = await db.collection("attempt/main/events").get(); for (const d of evs.docs) await db.doc("attempt/main/events/" + d.id).delete(); await db.doc("attempt/main").delete(); } catch (e) { toast("Reset failed: " + (e.code || e.message)); return; }
+  S = fresh(); chunk = 1; chunkEvents = []; UI.ownerResults = false; UI.view = "home"; UI.resultsData = null; render(); toast("Attempt deleted");
+}
+boot();
+</script>
+</body></html>
